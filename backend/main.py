@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User
-from schemas import UserCreate, UserResponse
-from security import hash_password
+from schemas import UserCreate, UserResponse, UserLogin
+from security import hash_password, verify_password
 
 app = FastAPI(
     title="MediConnect AI API",
@@ -55,3 +55,26 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     return new_user
+
+@app.post("/api/login", response_model=UserResponse)
+def login_user(user: UserLogin, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.email == user.email).first()
+
+    if not existing_user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    password_is_valid = verify_password(
+        user.password,
+        existing_user.password
+    )
+
+    if not password_is_valid:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    return existing_user
