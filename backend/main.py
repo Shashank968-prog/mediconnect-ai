@@ -415,3 +415,51 @@ def get_appointment_details(
         "status": appointment.status,
         "created_at": appointment.created_at
     }
+
+
+@app.patch("/api/appointments/{appointment_id}/cancel")
+def cancel_appointment(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    appointment = (
+        db.query(Appointment)
+        .filter(Appointment.id == appointment_id)
+        .first()
+    )
+
+    if not appointment:
+        raise HTTPException(
+            status_code=404,
+            detail="Appointment not found"
+        )
+
+    if appointment.patient_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only cancel your own appointments"
+        )
+
+    if appointment.status == "cancelled":
+        raise HTTPException(
+            status_code=400,
+            detail="Appointment is already cancelled"
+        )
+
+    if appointment.status == "completed":
+        raise HTTPException(
+            status_code=400,
+            detail="Completed appointments cannot be cancelled"
+        )
+
+    appointment.status = "cancelled"
+
+    db.commit()
+    db.refresh(appointment)
+
+    return {
+        "message": "Appointment cancelled successfully",
+        "appointment_id": appointment.id,
+        "status": appointment.status
+    }
