@@ -197,12 +197,14 @@ def create_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 1. Only patients can create appointments
     if current_user.role != "patient":
         raise HTTPException(
             status_code=403,
             detail="Only patients can create appointments"
         )
 
+    # 2. Check whether the selected user is a doctor
     doctor = (
         db.query(User)
         .filter(
@@ -218,12 +220,31 @@ def create_appointment(
             detail="Doctor not found"
         )
 
+    # 3. Check whether the appointment date is in the future
     if appointment.appointment_date <= datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(
             status_code=400,
             detail="Appointment date must be in the future"
         )
 
+    # 4. Check whether the doctor is already booked
+    existing_appointment = (
+        db.query(Appointment)
+        .filter(
+            Appointment.doctor_id == appointment.doctor_id,
+            Appointment.appointment_date == appointment.appointment_date,
+            Appointment.status != "cancelled"
+        )
+        .first()
+    )
+
+    if existing_appointment:
+        raise HTTPException(
+            status_code=400,
+            detail="This doctor is already booked for the selected time"
+        )
+
+    # 5. Create the new appointment
     new_appointment = Appointment(
         patient_id=current_user.id,
         doctor_id=appointment.doctor_id,
@@ -236,7 +257,6 @@ def create_appointment(
     db.refresh(new_appointment)
 
     return new_appointment
-
 
 @app.get(
     "/api/appointments",
