@@ -197,6 +197,12 @@ def create_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.role != "patient":
+        raise HTTPException(
+            status_code=403,
+            detail="Only patients can create appointments"
+        )
+
     doctor = (
         db.query(User)
         .filter(
@@ -230,6 +236,7 @@ def create_appointment(
     db.refresh(new_appointment)
 
     return new_appointment
+
 
 @app.get(
     "/api/appointments",
