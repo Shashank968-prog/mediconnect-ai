@@ -1,4 +1,7 @@
 from pydantic import BaseModel
+from datetime import datetime
+from pydantic import BaseModel
+
 
 
 class UserCreate(BaseModel):
@@ -37,3 +40,24 @@ class DoctorProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class AppointmentCreate(BaseModel):
+    doctor_id: int
+    appointment_date: datetime
+    reason: str
+
+
+class AppointmentResponse(BaseModel):
+    id: int
+    patient_id: int
+    doctor_id: int
+    appointment_date: datetime
+    reason: str
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AppointmentStatusUpdate(BaseModel):
+    status: str

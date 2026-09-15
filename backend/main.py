@@ -2,8 +2,27 @@ from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
 from database import Base, engine, get_db
-from models import DoctorProfile, User
+from models import Appointment, DoctorProfile, User
 from schemas import (
+    DoctorProfileCreate,
+    DoctorProfileResponse,
+    UserCreate,
+    UserLogin,
+    UserResponse
+)
+from schemas import (
+    AppointmentCreate,
+    AppointmentResponse,
+    DoctorProfileCreate,
+    DoctorProfileResponse,
+    UserCreate,
+    UserLogin,
+    UserResponse
+)
+from schemas import (
+    AppointmentCreate,
+    AppointmentResponse,
+    AppointmentStatusUpdate,
     DoctorProfileCreate,
     DoctorProfileResponse,
     UserCreate,
@@ -13,6 +32,8 @@ from schemas import (
 from security import hash_password, verify_password
 from auth import create_access_token, get_current_user, require_admin
 from fastapi.security import OAuth2PasswordRequestForm
+from datetime import datetime
+
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -164,3 +185,132 @@ def create_doctor_profile(
     db.refresh(new_doctor_profile)
 
     return new_doctor_profile
+
+
+@app.post(
+    "/api/appointments",
+    response_model=AppointmentResponse
+)
+def create_appointment(
+    appointment: AppointmentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    doctor = (
+        db.query(User)
+        .filter(
+            User.id == appointment.doctor_id,
+            User.role == "doctor"
+        )
+        .first()
+    )
+
+    if not doctor:
+        raise HTTPException(
+            status_code=404,
+            detail="Doctor not found"
+        )
+
+    new_appointment = Appointment(
+        patient_id=current_user.id,
+        doctor_id=appointment.doctor_id,
+        appointment_date=appointment.appointment_date,
+        reason=appointment.reason
+    )
+
+    db.add(new_appointment)
+    db.commit()
+    db.refresh(new_appointment)
+
+    return new_appointment
+
+@app.get(
+    "/api/appointments",
+    response_model=list[AppointmentResponse]
+)
+def get_appointments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role == "admin":
+        appointments = (
+            db.query(Appointment)
+            .order_by(Appointment.appointment_date)
+            .all()
+        )
+
+    elif current_user.role == "doctor":
+        appointments = (
+            db.query(Appointment)
+            .filter(Appointment.doctor_id == current_user.id)
+            .order_by(Appointment.appointment_date)
+            .all()
+        )
+
+    else:
+        appointments = (
+            db.query(Appointment)
+            .filter(Appointment.patient_id == current_user.id)
+            .order_by(Appointment.appointment_date)
+            .all()
+        )
+
+    return appointments
+
+
+@app.patch(
+    "/api/appointments/{appointment_id}/status",
+    response_model=AppointmentResponse
+)
+def update_appointment_status(
+    appointment_id: int,
+    status_update: AppointmentStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role not in ["doctor", "admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only doctors or admins can update appointment status"
+        )
+
+    appointment = (
+        db.query(Appointment)
+        .filter(Appointment.id == appointment_id)
+        .first()
+    )
+
+    if not appointment:
+        raise HTTPException(
+            status_code=404,
+            detail="Appointment not found"
+        )
+
+    if (
+        current_user.role == "doctor"
+        and appointment.doctor_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You can update only your own appointments"
+        )
+
+    allowed_statuses = [
+        "pending",
+        "approved",
+        "completed",
+        "cancelled"
+    ]
+
+    if status_update.status not in allowed_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid appointment status"
+        )
+
+    appointment.status = status_update.status
+
+    db.commit()
+    db.refresh(appointment)
+
+    return appointment

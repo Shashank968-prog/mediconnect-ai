@@ -1,12 +1,10 @@
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
-from schemas import (
-    DoctorProfileCreate,
-    DoctorProfileResponse,
-    UserCreate,
-    UserLogin,
-    UserResponse
-)
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+from datetime import datetime
+from pydantic import BaseModel
+
 
 from database import Base
 
@@ -47,3 +45,56 @@ class DoctorProfile(Base):
         "User",
         back_populates="doctor_profile"
     )
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    doctor_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    appointment_date = Column(
+        DateTime,
+        nullable=False
+    )
+
+    reason = Column(
+        String(500),
+        nullable=False
+    )
+
+    status = Column(
+        String(20),
+        nullable=False,
+        default="pending"
+    )
+
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    patient = relationship(
+        "User",
+        foreign_keys=[patient_id]
+    )
+
+    doctor = relationship(
+        "User",
+        foreign_keys=[doctor_id]
+    )
+
+class AppointmentStatusUpdate(BaseModel):
+    status: str
