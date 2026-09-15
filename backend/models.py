@@ -4,6 +4,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from pydantic import BaseModel
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 
 
 from database import Base
@@ -17,6 +18,11 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False, default="patient")
+    is_active = Column(
+    Boolean,
+    nullable=False,
+    default=True
+)
 
     doctor_profile = relationship(
         "DoctorProfile",
@@ -97,15 +103,3 @@ class Appointment(Base):
     )
 
 
-class AppointmentDetailResponse(BaseModel):
-    id: int
-    patient_id: int
-    patient_name: str
-    patient_email: str
-    doctor_id: int
-    doctor_name: str
-    doctor_email: str
-    appointment_date: datetime
-    reason: str
-    status: str
-    created_at: datetime

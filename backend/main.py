@@ -17,7 +17,8 @@ from schemas import (
     DoctorProfileResponse,
     UserCreate,
     UserLogin,
-    UserResponse
+    UserResponse,
+    PasswordChangeRequest
 )
 from schemas import (
     AppointmentCreate,
@@ -113,6 +114,12 @@ def login_user(
             status_code=401,
             detail="Invalid email or password"
         )
+
+    if not existing_user.is_active:
+        raise HTTPException(
+        status_code=403,
+        detail="Your account is deactivated"
+    )
 
     password_is_valid = verify_password(
         form_data.password,
@@ -329,20 +336,32 @@ def update_appointment_status(
             detail="You can update only your own appointments"
         )
 
-    allowed_statuses = [
-        "pending",
-        "approved",
-        "completed",
-        "cancelled"
-    ]
+    allowed_transitions = {
+        "pending": ["approved", "cancelled"],
+        "approved": ["completed", "cancelled"],
+        "completed": [],
+        "cancelled": []
+    }
 
-    if status_update.status not in allowed_statuses:
+    if status_update.status not in allowed_transitions:
         raise HTTPException(
             status_code=400,
             detail="Invalid appointment status"
         )
 
-    appointment.status = status_update.status
+    current_status = appointment.status
+    requested_status = status_update.status
+
+    if requested_status not in allowed_transitions[current_status]:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Cannot change appointment status "
+                f"from '{current_status}' to '{requested_status}'"
+            )
+        )
+
+    appointment.status = requested_status
 
     db.commit()
     db.refresh(appointment)
@@ -486,3 +505,72 @@ def get_doctor_profile(
         )
 
     return doctor_profile
+
+
+
+@app.get(
+    "/api/doctors",
+    response_model=list[DoctorProfileResponse]
+)
+def get_all_doctors(
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    doctor_profiles = (
+        db.query(DoctorProfile)
+        .join(User, DoctorProfile.user_id == User.id)
+        .filter(User.role == "doctor")
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return doctor_profiles
+
+
+@app.patch("/api/change-password")
+def change_password(
+    password_data: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not verify_password(
+        password_data.current_password,
+        current_user.password
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Current password is incorrect"
+        )
+
+    current_user.password = hash_password(
+        password_data.new_password
+    )
+
+    db.commit()
+
+    return {
+        "message": "Password changed successfully"
+    }
+
+
+@app.patch("/api/deactivate-account")
+def deactivate_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Account is already deactivated"
+        )
+
+    current_user.is_active = False
+
+    db.commit()
+
+    return {
+        "message": "Account deactivated successfully"
+    }
