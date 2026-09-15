@@ -23,6 +23,7 @@ from schemas import (
     AppointmentCreate,
     AppointmentResponse,
     AppointmentStatusUpdate,
+    AppointmentDetailResponse,
     DoctorProfileCreate,
     DoctorProfileResponse,
     UserCreate,
@@ -314,3 +315,70 @@ def update_appointment_status(
     db.refresh(appointment)
 
     return appointment
+
+@app.get(
+    "/api/appointments/{appointment_id}",
+    response_model=AppointmentDetailResponse
+)
+def get_appointment_details(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    appointment = (
+        db.query(Appointment)
+        .filter(Appointment.id == appointment_id)
+        .first()
+    )
+
+    if not appointment:
+        raise HTTPException(
+            status_code=404,
+            detail="Appointment not found"
+        )
+
+    if current_user.role == "patient":
+        if appointment.patient_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can view only your own appointments"
+            )
+
+    elif current_user.role == "doctor":
+        if appointment.doctor_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can view only your assigned appointments"
+            )
+
+    elif current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    patient = (
+        db.query(User)
+        .filter(User.id == appointment.patient_id)
+        .first()
+    )
+
+    doctor = (
+        db.query(User)
+        .filter(User.id == appointment.doctor_id)
+        .first()
+    )
+
+    return {
+        "id": appointment.id,
+        "patient_id": appointment.patient_id,
+        "patient_name": patient.name,
+        "patient_email": patient.email,
+        "doctor_id": appointment.doctor_id,
+        "doctor_name": doctor.name,
+        "doctor_email": doctor.email,
+        "appointment_date": appointment.appointment_date,
+        "reason": appointment.reason,
+        "status": appointment.status,
+        "created_at": appointment.created_at
+    }

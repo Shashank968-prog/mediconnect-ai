@@ -61,3 +61,16 @@ class AppointmentResponse(BaseModel):
 
 class AppointmentStatusUpdate(BaseModel):
     status: str
+
+class AppointmentDetailResponse(BaseModel):
+    id: int
+    patient_id: int
+    patient_name: str
+    patient_email: str
+    doctor_id: int
+    doctor_name: str
+    doctor_email: str
+    appointment_date: datetime
+    reason: str
+    status: str
+    created_at: datetime
