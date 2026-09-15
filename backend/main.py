@@ -35,6 +35,7 @@ from security import hash_password, verify_password
 from auth import create_access_token, get_current_user, require_admin
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timezone
+from fastapi.middleware.cors import CORSMiddleware
 
 
 # Create database tables
@@ -46,6 +47,16 @@ app = FastAPI(
     title="MediConnect AI API",
     description="Healthcare management and AI platform",
     version="0.1.0"
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
