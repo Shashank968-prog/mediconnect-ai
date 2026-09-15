@@ -33,7 +33,7 @@ from schemas import (
 from security import hash_password, verify_password
 from auth import create_access_token, get_current_user, require_admin
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # Create database tables
@@ -210,6 +210,12 @@ def create_appointment(
         raise HTTPException(
             status_code=404,
             detail="Doctor not found"
+        )
+
+    if appointment.appointment_date <= datetime.now(timezone.utc).replace(tzinfo=None):
+        raise HTTPException(
+            status_code=400,
+            detail="Appointment date must be in the future"
         )
 
     new_appointment = Appointment(
