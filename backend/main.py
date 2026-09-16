@@ -1,11 +1,17 @@
+from multiprocessing import get_context
+
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+import secrets
+from pwdlib import PasswordHash
 
 from database import Base, engine, get_db
-from models import Appointment, DoctorProfile, User
+from models import Appointment, DoctorProfile, PasswordResetToken, User
 from schemas import (
     DoctorProfileCreate,
     DoctorProfileResponse,
+    ForgotPasswordRequest,
     UserCreate,
     UserLogin,
     UserResponse
@@ -29,13 +35,32 @@ from schemas import (
     DoctorProfileResponse,
     UserCreate,
     UserLogin,
-    UserResponse
+    UserResponse,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
 from security import hash_password, verify_password
 from auth import create_access_token, get_current_user, require_admin
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timezone
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+import os
+from dotenv import load_dotenv
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+
+load_dotenv()
+
+mail_config = ConnectionConfig(
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+    MAIL_FROM=os.getenv("MAIL_FROM"),
+    MAIL_PORT=587,
+    MAIL_SERVER="smtp.gmail.com",
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=True,
+)
 
 
 # Create database tables
@@ -276,38 +301,6 @@ def create_appointment(
 
     return new_appointment
 
-@app.get(
-    "/api/appointments",
-    response_model=list[AppointmentResponse]
-)
-def get_appointments(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    if current_user.role == "admin":
-        appointments = (
-            db.query(Appointment)
-            .order_by(Appointment.appointment_date)
-            .all()
-        )
-
-    elif current_user.role == "doctor":
-        appointments = (
-            db.query(Appointment)
-            .filter(Appointment.doctor_id == current_user.id)
-            .order_by(Appointment.appointment_date)
-            .all()
-        )
-
-    else:
-        appointments = (
-            db.query(Appointment)
-            .filter(Appointment.patient_id == current_user.id)
-            .order_by(Appointment.appointment_date)
-            .all()
-        )
-
-    return appointments
 
 
 @app.patch(
@@ -380,72 +373,71 @@ def update_appointment_status(
     return appointment
 
 @app.get(
-    "/api/appointments/{appointment_id}",
-    response_model=AppointmentDetailResponse
+    "/api/appointments",
+    response_model=list[AppointmentResponse]
 )
-def get_appointment_details(
-    appointment_id: int,
+def get_appointments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    appointment = (
-        db.query(Appointment)
-        .filter(Appointment.id == appointment_id)
-        .first()
-    )
-
-    if not appointment:
-        raise HTTPException(
-            status_code=404,
-            detail="Appointment not found"
+    if current_user.role == "admin":
+        appointments = (
+            db.query(Appointment)
+            .order_by(Appointment.appointment_date)
+            .all()
         )
-
-    if current_user.role == "patient":
-        if appointment.patient_id != current_user.id:
-            raise HTTPException(
-                status_code=403,
-                detail="You can view only your own appointments"
-            )
 
     elif current_user.role == "doctor":
-        if appointment.doctor_id != current_user.id:
-            raise HTTPException(
-                status_code=403,
-                detail="You can view only your assigned appointments"
-            )
-
-    elif current_user.role != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied"
+        appointments = (
+            db.query(Appointment)
+            .filter(Appointment.doctor_id == current_user.id)
+            .order_by(Appointment.appointment_date)
+            .all()
         )
 
-    patient = (
-        db.query(User)
-        .filter(User.id == appointment.patient_id)
-        .first()
-    )
+    else:
+        appointments = (
+            db.query(Appointment)
+            .filter(Appointment.patient_id == current_user.id)
+            .order_by(Appointment.appointment_date)
+            .all()
+        )
 
-    doctor = (
-        db.query(User)
-        .filter(User.id == appointment.doctor_id)
-        .first()
-    )
+    result = []
 
-    return {
-        "id": appointment.id,
-        "patient_id": appointment.patient_id,
-        "patient_name": patient.name,
-        "patient_email": patient.email,
-        "doctor_id": appointment.doctor_id,
-        "doctor_name": doctor.name,
-        "doctor_email": doctor.email,
-        "appointment_date": appointment.appointment_date,
-        "reason": appointment.reason,
-        "status": appointment.status,
-        "created_at": appointment.created_at
-    }
+    for appointment in appointments:
+        doctor = (
+            db.query(User)
+            .filter(User.id == appointment.doctor_id)
+            .first()
+        )
 
+        doctor_profile = (
+            db.query(DoctorProfile)
+            .filter(DoctorProfile.user_id == appointment.doctor_id)
+            .first()
+        )
+
+        if not doctor or not doctor_profile:
+            continue
+
+        result.append(
+            AppointmentResponse(
+                id=appointment.id,
+                patient_id=appointment.patient_id,
+                doctor_id=appointment.doctor_id,
+                appointment_date=appointment.appointment_date,
+                reason=appointment.reason,
+                status=appointment.status,
+                created_at=appointment.created_at,
+                doctor_name=doctor.name,
+                specialization=doctor_profile.specialization,
+                qualification=doctor_profile.qualification,
+                experience_years=doctor_profile.experience_years
+            )
+        )
+
+    return result
 
 @app.patch("/api/appointments/{appointment_id}/cancel")
 def cancel_appointment(
@@ -584,4 +576,83 @@ def deactivate_account(
 
     return {
         "message": "Account deactivated successfully"
+    }
+
+
+@app.post("/api/forgot-password")
+def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == request.email).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with this email."
+        )
+
+    token = secrets.token_urlsafe(32)
+
+    expires_at = datetime.utcnow() + timedelta(minutes=15)
+
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token=token,
+        expires_at=expires_at
+    )
+
+    db.add(reset_token)
+    db.commit()
+
+    return {
+        "message": "Password reset token generated.",
+        "token": token
+    }
+
+
+@app.post("/api/reset-password")
+def reset_password(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    reset_token = (
+        db.query(PasswordResetToken)
+        .filter(
+            PasswordResetToken.token == request.token,
+            PasswordResetToken.used == False
+        )
+        .first()
+    )
+
+    if not reset_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or already used reset token."
+        )
+
+    if reset_token.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=400,
+            detail="Reset token has expired."
+        )
+
+    user = db.query(User).filter(
+        User.id == reset_token.user_id
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User account not found."
+        )
+
+    user.password = hash_password(request.new_password)
+
+    reset_token.used = True
+
+    db.commit()
+
+    return {
+        "message": "Password reset successfully."
     }

@@ -3,17 +3,20 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
 function Login() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (event) => {
     event.preventDefault();
-    setMessage("");
 
     try {
+      setLoading(true);
+      setMessage("");
+
       const formData = new URLSearchParams();
 
       formData.append("username", email);
@@ -25,97 +28,78 @@ function Login() {
         },
       });
 
-      localStorage.setItem("access_token", response.data.access_token);
+      const token = response.data.access_token;
 
-      setMessage("Login successful!");
+      localStorage.setItem("access_token", token);
 
-      setTimeout(() => {
+      const profileResponse = await api.get("/api/profile", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const role = profileResponse.data.role;
+
+      if (role === "doctor") {
+        navigate("/doctor-dashboard");
+      } else {
         navigate("/dashboard");
-      }, 800);
+      }
     } catch (error) {
       setMessage(
-        error.response?.data?.detail || "Login failed. Please try again."
+        error.response?.data?.detail ||
+          "Login failed. Please check your email and password."
       );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <main className="auth-page">
-      <section className="auth-container">
-        <div className="auth-info">
-          <p className="auth-tag">WELCOME BACK</p>
+    <main className="dashboard-page">
+      <section className="dashboard-card">
+        <h1>Login</h1>
 
-          <h1>
-            Your health journey
-            <span> continues here.</span>
-          </h1>
+        <form onSubmit={handleLogin}>
+          <div className="form-group">
+            <label>Email</label>
 
-          <p>
-            Sign in to manage appointments, connect with doctors, and access
-            your personalized healthcare experience.
-          </p>
-
-          <div className="auth-highlight">
-            <span>✚</span>
-            <div>
-              <strong>Trusted Healthcare Support</strong>
-              <p>Simple, secure, and intelligent healthcare management.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="auth-card">
-          <div className="auth-card-header">
-            <div className="auth-logo">✚</div>
-            <h2>Login to MediConnect AI</h2>
-            <p>Enter your details to access your account.</p>
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="Enter your email"
+              required
+            />
           </div>
 
-          <form className="auth-form" onSubmit={handleLogin}>
-            <div className="form-group">
-              <label htmlFor="email">Email Address</label>
-              <input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </div>
+          <div className="form-group">
+            <label>Password</label>
 
-            <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </div>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter your password"
+              required
+            />
+          </div>
 
-            <button className="auth-submit" type="submit">
-              Login
-            </button>
-          </form>
+          <button type="submit" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
 
-          {message && (
-            <p
-              className={`auth-message ${
-                message.includes("successful") ? "success-message" : ""
-              }`}
-            >
-              {message}
-            </p>
-          )}
+          {message && <p>{message}</p>}
+        </form>
 
-          <p className="auth-footer">
-            Don't have an account?{" "}
-            <a href="/register">Create an account</a>
-          </p>
-        </div>
+        <p>
+          <button
+            type="button"
+            onClick={() => navigate("/forgot-password")}
+          >
+            Forgot Password?
+          </button>
+        </p>
       </section>
     </main>
   );

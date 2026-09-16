@@ -5,7 +5,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from pydantic import BaseModel
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
-
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 
 from database import Base
 
@@ -102,4 +102,27 @@ class Appointment(Base):
         foreign_keys=[doctor_id]
     )
 
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
 
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(String(255), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, nullable=False, default=False)
+
+    user = relationship("User")
+
+
+class PasswordResetOTP(Base):
+    __tablename__ = "password_reset_otps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    otp_hash = Column(String(255), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    attempts = Column(Integer, nullable=False, default=0)
+    used = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    user = relationship("User")

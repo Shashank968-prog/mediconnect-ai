@@ -71,9 +71,10 @@ class AppointmentResponse(BaseModel):
     reason: str
     status: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
+    doctor_name: str
+    specialization: str
+    qualification: str
+    experience_years: int
 
 class AppointmentStatusUpdate(BaseModel):
     status: str
@@ -101,3 +102,11 @@ class PasswordChangeRequest(BaseModel):
         min_length=8,
         description="The new password must contain at least 8 characters"
     )
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
