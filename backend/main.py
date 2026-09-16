@@ -14,7 +14,8 @@ from schemas import (
     ForgotPasswordRequest,
     UserCreate,
     UserLogin,
-    UserResponse
+    UserResponse,
+    VerifyOTPRequest
 )
 from schemas import (
     AppointmentCreate,
@@ -38,6 +39,7 @@ from schemas import (
     UserResponse,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    AssistantRequest,
 )
 from security import hash_password, verify_password
 from auth import create_access_token, get_current_user, require_admin
@@ -48,6 +50,11 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 import os
 from dotenv import load_dotenv
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+import random
+from datetime import datetime, timedelta
+from fastapi_mail import FastMail, MessageSchema
+from models import User, DoctorProfile, Appointment, PasswordResetToken, PasswordResetOTP
+from ai_service import ask_gemini
 
 load_dotenv()
 
@@ -580,11 +587,13 @@ def deactivate_account(
 
 
 @app.post("/api/forgot-password")
-def forgot_password(
+async def forgot_password(
     request: ForgotPasswordRequest,
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.email == request.email).first()
+    user = db.query(User).filter(
+        User.email == request.email
+    ).first()
 
     if not user:
         raise HTTPException(
@@ -592,22 +601,49 @@ def forgot_password(
             detail="No account found with this email."
         )
 
-    token = secrets.token_urlsafe(32)
+    otp = str(random.randint(100000, 999999))
 
-    expires_at = datetime.utcnow() + timedelta(minutes=15)
+    otp_hash = hash_password(otp)
 
-    reset_token = PasswordResetToken(
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+
+    reset_otp = PasswordResetOTP(
         user_id=user.id,
-        token=token,
-        expires_at=expires_at
+        otp_hash=otp_hash,
+        expires_at=expires_at,
+        attempts=0,
+        used=False
     )
 
-    db.add(reset_token)
+    db.add(reset_otp)
     db.commit()
 
+    message = MessageSchema(
+        subject="MediConnect AI - Password Reset OTP",
+        recipients=[request.email],
+        body=f"""
+Hello,
+
+Your MediConnect AI password reset OTP is:
+
+{otp}
+
+This OTP will expire in 10 minutes.
+
+If you did not request a password reset, please ignore this email.
+
+Regards,
+MediConnect AI
+""",
+        subtype="plain"
+    )
+
+    fast_mail = FastMail(mail_config)
+
+    await fast_mail.send_message(message)
+
     return {
-        "message": "Password reset token generated.",
-        "token": token
+        "message": "Password reset OTP has been sent to your email."
     }
 
 
@@ -616,29 +652,8 @@ def reset_password(
     request: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ):
-    reset_token = (
-        db.query(PasswordResetToken)
-        .filter(
-            PasswordResetToken.token == request.token,
-            PasswordResetToken.used == False
-        )
-        .first()
-    )
-
-    if not reset_token:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid or already used reset token."
-        )
-
-    if reset_token.expires_at < datetime.utcnow():
-        raise HTTPException(
-            status_code=400,
-            detail="Reset token has expired."
-        )
-
     user = db.query(User).filter(
-        User.id == reset_token.user_id
+        User.email == request.email
     ).first()
 
     if not user:
@@ -647,12 +662,120 @@ def reset_password(
             detail="User account not found."
         )
 
-    user.password = hash_password(request.new_password)
+    reset_otp = (
+        db.query(PasswordResetOTP)
+        .filter(
+            PasswordResetOTP.user_id == user.id,
+            PasswordResetOTP.used == False
+        )
+        .order_by(PasswordResetOTP.created_at.desc())
+        .first()
+    )
 
-    reset_token.used = True
+    if not reset_otp:
+        raise HTTPException(
+            status_code=400,
+            detail="No active OTP found."
+        )
+
+    if reset_otp.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=400,
+            detail="OTP has expired."
+        )
+
+    if reset_otp.attempts >= 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Too many incorrect OTP attempts."
+        )
+
+    if not verify_password(
+        request.otp,
+        reset_otp.otp_hash
+    ):
+        reset_otp.attempts += 1
+        db.commit()
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid OTP."
+        )
+
+    user.password = hash_password(
+        request.new_password
+    )
+
+    reset_otp.used = True
 
     db.commit()
 
     return {
         "message": "Password reset successfully."
+    }
+
+@app.post("/api/verify-otp")
+def verify_otp(
+    request: VerifyOTPRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(
+        User.email == request.email
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User account not found."
+        )
+
+    reset_otp = (
+        db.query(PasswordResetOTP)
+        .filter(
+            PasswordResetOTP.user_id == user.id,
+            PasswordResetOTP.used == False
+        )
+        .order_by(PasswordResetOTP.created_at.desc())
+        .first()
+    )
+
+    if not reset_otp:
+        raise HTTPException(
+            status_code=400,
+            detail="No active OTP found."
+        )
+
+    if reset_otp.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=400,
+            detail="OTP has expired."
+        )
+
+    if reset_otp.attempts >= 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Too many incorrect OTP attempts."
+        )
+
+    if not verify_password(request.otp, reset_otp.otp_hash):
+        reset_otp.attempts += 1
+        db.commit()
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid OTP."
+        )
+
+    return {
+        "message": "OTP verified successfully."
+    }
+
+@app.post("/api/assistant")
+def assistant(
+    request: AssistantRequest
+):
+    response = ask_gemini(request.message)
+
+    return {
+        "response": response
     }

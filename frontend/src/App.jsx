@@ -10,6 +10,7 @@ import Appointments from "./pages/Appointments";
 import Doctors from "./pages/Doctors";
 import BookAppointment from "./pages/BookAppointment";
 import DoctorDashboard from "./pages/DoctorDashboard";
+import Assistant from "./pages/Assistant";
 import "./App.css";
 
 function App() {
@@ -45,6 +46,11 @@ function App() {
         <Route
           path="/doctor-dashboard"
           element={<DoctorDashboard />}
+        />
+
+        <Route
+          path="/assistant"
+          element={<Assistant />}
         />
       </Routes>
     </BrowserRouter>
