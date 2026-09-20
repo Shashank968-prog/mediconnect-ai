@@ -4,6 +4,7 @@ import api from "../services/api";
 function Assistant() {
   const [message, setMessage] = useState("");
   const [response, setResponse] = useState("");
+  const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const handleAsk = async (event) => {
@@ -16,12 +17,14 @@ function Assistant() {
     try {
       setLoading(true);
       setResponse("");
+      setSources([]);
 
       const result = await api.post("/api/assistant", {
         message: message,
       });
 
       setResponse(result.data.response);
+      setSources(result.data.sources || []);
     } catch (error) {
       setResponse(
         error.response?.data?.detail ||
@@ -48,7 +51,7 @@ function Assistant() {
             <textarea
               value={message}
               onChange={(event) => setMessage(event.target.value)}
-              placeholder="For example: What are the common symptoms of flu?"
+              placeholder="For example: What are the common symptoms of diabetes?"
               rows="5"
               required
             />
@@ -63,6 +66,18 @@ function Assistant() {
           <div>
             <h2>AI Response</h2>
             <p>{response}</p>
+          </div>
+        )}
+
+        {sources.length > 0 && (
+          <div>
+            <h2>Sources</h2>
+
+            {sources.map((source, index) => (
+              <p key={index}>
+                📄 {source.source} — Page {source.page + 1}
+              </p>
+            ))}
           </div>
         )}
       </section>

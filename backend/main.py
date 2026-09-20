@@ -1,33 +1,26 @@
-from multiprocessing import get_context
+from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, FastAPI, HTTPException
-from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+import os
+import random
 import secrets
-from pwdlib import PasswordHash
 
-from database import Base, engine, get_db
-from models import Appointment, DoctorProfile, PasswordResetToken, User
-from schemas import (
-    DoctorProfileCreate,
-    DoctorProfileResponse,
-    ForgotPasswordRequest,
-    UserCreate,
-    UserLogin,
-    UserResponse,
-    VerifyOTPRequest
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from pwdlib import PasswordHash
+from sqlalchemy.orm import Session
+
+from backend.database import Base, engine, get_db
+from backend.models import (
+    Appointment,
+    DoctorProfile,
+    PasswordResetOTP,
+    PasswordResetToken,
+    User,
 )
-from schemas import (
-    AppointmentCreate,
-    AppointmentResponse,
-    DoctorProfileCreate,
-    DoctorProfileResponse,
-    UserCreate,
-    UserLogin,
-    UserResponse,
-    PasswordChangeRequest
-)
-from schemas import (
+from backend.schemas import (
     AppointmentCreate,
     AppointmentResponse,
     AppointmentStatusUpdate,
@@ -39,22 +32,15 @@ from schemas import (
     UserResponse,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    VerifyOTPRequest,
+    PasswordChangeRequest,
     AssistantRequest,
 )
-from security import hash_password, verify_password
-from auth import create_access_token, get_current_user, require_admin
-from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime, timezone
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
-import os
-from dotenv import load_dotenv
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
-import random
-from datetime import datetime, timedelta
-from fastapi_mail import FastMail, MessageSchema
-from models import User, DoctorProfile, Appointment, PasswordResetToken, PasswordResetOTP
-from ai_service import ask_gemini
+from backend.security import hash_password, verify_password
+from backend.auth import create_access_token, get_current_user, require_admin
+from backend.ai_service import ask_gemini
+from backend.ai_orchestrator import process_ai_request
+from rag.rag_service import ask_rag
 
 load_dotenv()
 
@@ -770,12 +756,15 @@ def verify_otp(
         "message": "OTP verified successfully."
     }
 
+
+
 @app.post("/api/assistant")
 def assistant(
     request: AssistantRequest
 ):
-    response = ask_gemini(request.message)
+    result = process_ai_request(request.message)
 
     return {
-        "response": response
+        "response": result["answer"],
+        "sources": result["sources"]
     }

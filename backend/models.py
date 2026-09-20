@@ -1,3 +1,26 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+BASE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(BASE_DIR / ".env")
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(DATABASE_URL)
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
+
+Base = declarative_base()
+
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
@@ -7,7 +30,7 @@ from pydantic import BaseModel
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 
-from database import Base
+from backend.database import Base
 
 
 class User(Base):
