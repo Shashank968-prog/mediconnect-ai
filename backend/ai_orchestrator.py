@@ -6,30 +6,74 @@ from rag.rag_service import ask_rag
 
 
 def extract_specialization(message: str):
-    specializations = [
-        "general medicine",
-        "cardiology",
-        "dermatology",
-        "neurology",
-        "orthopedics",
-        "pediatrics",
-        "gynecology",
-        "psychiatry",
-        "ophthalmology",
-        "dentistry"
-    ]
+    specialization_keywords = {
+        "general medicine": [
+            "general medicine",
+            "general physician",
+            "general doctor"
+        ],
+        "cardiology": [
+            "cardiology",
+            "cardiologist",
+            "heart doctor"
+        ],
+        "dermatology": [
+            "dermatology",
+            "dermatologist",
+            "skin doctor"
+        ],
+        "neurology": [
+            "neurology",
+            "neurologist",
+            "brain doctor"
+        ],
+        "orthopedics": [
+            "orthopedics",
+            "orthopedic doctor",
+            "bone doctor"
+        ],
+        "pediatrics": [
+            "pediatrics",
+            "pediatrician",
+            "children doctor"
+        ],
+        "gynecology": [
+            "gynecology",
+            "gynecologist",
+            "women's doctor"
+        ],
+        "psychiatry": [
+            "psychiatry",
+            "psychiatrist",
+            "mental health doctor"
+        ],
+        "ophthalmology": [
+            "ophthalmology",
+            "ophthalmologist",
+            "eye doctor"
+        ],
+        "dentistry": [
+            "dentistry",
+            "dentist",
+            "dental doctor"
+        ]
+    }
 
     message_lower = message.lower()
 
-    for specialization in specializations:
-        if specialization in message_lower:
-            return specialization
+    for specialization, keywords in specialization_keywords.items():
+        for keyword in keywords:
+            if keyword in message_lower:
+                return specialization
 
     return None
 
 
 def extract_doctor_id(message: str):
-    match = re.search(r"doctor\s*(?:id\s*)?(\d+)", message.lower())
+    match = re.search(
+        r"doctor\s*(?:id\s*)?(\d+)",
+        message.lower()
+    )
 
     if match:
         return int(match.group(1))
@@ -38,7 +82,10 @@ def extract_doctor_id(message: str):
 
 
 def extract_appointment_id(message: str):
-    match = re.search(r"appointment\s*(?:id\s*)?(\d+)", message.lower())
+    match = re.search(
+        r"appointment\s*(?:id\s*)?(\d+)",
+        message.lower()
+    )
 
     if match:
         return int(match.group(1))
@@ -93,7 +140,9 @@ def process_ai_request(message: str, current_user):
         result = asyncio.run(
             call_mcp_tool(
                 "get_patient_appointments",
-                {"patient_id": current_user.id}
+                {
+                    "patient_id": current_user.id
+                }
             )
         )
 
@@ -115,7 +164,9 @@ def process_ai_request(message: str, current_user):
             result = asyncio.run(
                 call_mcp_tool(
                     "get_doctor_details",
-                    {"doctor_id": doctor_id}
+                    {
+                        "doctor_id": doctor_id
+                    }
                 )
             )
 
@@ -124,10 +175,11 @@ def process_ai_request(message: str, current_user):
                 "sources": []
             }
 
-    if "doctor" in message_lower and (
+    if (
         "find" in message_lower
         or "search" in message_lower
         or "show" in message_lower
+        or "need" in message_lower
     ):
         specialization = extract_specialization(message)
 
@@ -135,7 +187,9 @@ def process_ai_request(message: str, current_user):
             result = asyncio.run(
                 call_mcp_tool(
                     "search_doctors",
-                    {"specialization": specialization}
+                    {
+                        "specialization": specialization
+                    }
                 )
             )
 
