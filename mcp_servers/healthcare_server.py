@@ -120,5 +120,39 @@ def get_patient_appointments(patient_id: int) -> str:
         db.close()
 
 
+@mcp.tool()
+def cancel_patient_appointment(patient_id: int, appointment_id: int) -> str:
+    db = SessionLocal()
+
+    try:
+        appointment = (
+            db.query(Appointment)
+            .filter(
+                Appointment.id == appointment_id,
+                Appointment.patient_id == patient_id
+            )
+            .first()
+        )
+
+        if not appointment:
+            return "Appointment not found or you do not have permission to cancel it."
+
+        if appointment.status == "cancelled":
+            return "This appointment is already cancelled."
+
+        if appointment.status == "completed":
+            return "Completed appointments cannot be cancelled."
+
+        appointment.status = "cancelled"
+        db.commit()
+
+        return (
+            f"Appointment {appointment.id} has been cancelled successfully."
+        )
+
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
     mcp.run()
