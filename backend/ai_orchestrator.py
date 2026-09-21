@@ -37,8 +37,47 @@ def extract_doctor_id(message: str):
     return None
 
 
+def extract_appointment_id(message: str):
+    match = re.search(r"appointment\s*(?:id\s*)?(\d+)", message.lower())
+
+    if match:
+        return int(match.group(1))
+
+    return None
+
+
 def process_ai_request(message: str, current_user):
     message_lower = message.lower()
+
+    if "cancel" in message_lower and "appointment" in message_lower:
+        if current_user.role != "patient":
+            return {
+                "answer": "Only patients can cancel their appointments through the AI assistant.",
+                "sources": []
+            }
+
+        appointment_id = extract_appointment_id(message)
+
+        if not appointment_id:
+            return {
+                "answer": "Please provide the appointment ID you want to cancel.",
+                "sources": []
+            }
+
+        result = asyncio.run(
+            call_mcp_tool(
+                "cancel_patient_appointment",
+                {
+                    "patient_id": current_user.id,
+                    "appointment_id": appointment_id
+                }
+            )
+        )
+
+        return {
+            "answer": result.content[0].text,
+            "sources": []
+        }
 
     if "appointment" in message_lower and (
         "my" in message_lower

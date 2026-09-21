@@ -233,14 +233,12 @@ def create_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Only patients can create appointments
     if current_user.role != "patient":
         raise HTTPException(
             status_code=403,
             detail="Only patients can create appointments"
         )
 
-    # 2. Check whether the selected user is a doctor
     doctor = (
         db.query(User)
         .filter(
@@ -256,14 +254,12 @@ def create_appointment(
             detail="Doctor not found"
         )
 
-    # 3. Check whether the appointment date is in the future
     if appointment.appointment_date <= datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(
             status_code=400,
             detail="Appointment date must be in the future"
         )
 
-    # 4. Check whether the doctor is already booked
     existing_appointment = (
         db.query(Appointment)
         .filter(
@@ -280,7 +276,6 @@ def create_appointment(
             detail="This doctor is already booked for the selected time"
         )
 
-    # 5. Create the new appointment
     new_appointment = Appointment(
         patient_id=current_user.id,
         doctor_id=appointment.doctor_id,
@@ -292,8 +287,30 @@ def create_appointment(
     db.commit()
     db.refresh(new_appointment)
 
-    return new_appointment
+    doctor_profile = (
+        db.query(DoctorProfile)
+        .filter(DoctorProfile.user_id == doctor.id)
+        .first()
+    )
 
+    if not doctor_profile:
+        raise HTTPException(
+            status_code=404,
+            detail="Doctor profile not found"
+        )
+
+    return {
+        "id": new_appointment.id,
+        "patient_id": new_appointment.patient_id,
+        "doctor_id": new_appointment.doctor_id,
+        "appointment_date": new_appointment.appointment_date,
+        "reason": new_appointment.reason,
+        "status": new_appointment.status,
+        "doctor_name": doctor.name,
+        "specialization": doctor_profile.specialization,
+        "qualification": doctor_profile.qualification,
+        "experience_years": doctor_profile.experience_years
+    }
 
 
 @app.patch(
@@ -763,6 +780,13 @@ def assistant(
     request: AssistantRequest,
     current_user: User = Depends(get_current_user)
 ):
+    print(
+        "Authenticated user:",
+        current_user.id,
+        current_user.email,
+        current_user.role
+    )
+
     result = process_ai_request(
         request.message,
         current_user
