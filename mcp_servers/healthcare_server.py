@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from datetime import datetime
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -153,6 +154,94 @@ def cancel_patient_appointment(patient_id: int, appointment_id: int) -> str:
     finally:
         db.close()
 
+@mcp.tool()
+def book_appointment(
+    patient_id: int,
+    doctor_id: int,
+    appointment_date: str,
+    reason: str = ""
+) -> str:
+    db = SessionLocal()
+
+    try:
+        if not db.query(User).filter(
+            User.id == patient_id,
+            User.role == "patient",
+            User.is_active == True
+        ).first():
+            return "Patient not found or inactive."
+
+        doctor = (
+            db.query(User)
+            .filter(
+                User.id == doctor_id,
+                User.role == "doctor",
+                User.is_active == True
+            )
+            .first()
+        )
+
+        if not doctor:
+            return "Doctor not found."
+
+        try:
+            appointment_datetime = datetime.fromisoformat(
+                appointment_date
+            )
+        except ValueError:
+            return "Invalid appointment date format."
+
+        if appointment_datetime <= datetime.utcnow():
+            return "Appointment date must be in the future."
+
+        existing_appointment = (
+            db.query(Appointment)
+            .filter(
+                Appointment.doctor_id == doctor_id,
+                Appointment.appointment_date == appointment_datetime,
+                Appointment.status != "cancelled"
+            )
+            .first()
+        )
+
+        if existing_appointment:
+            return "This doctor is already booked for the selected time."
+
+        new_appointment = Appointment(
+            patient_id=patient_id,
+            doctor_id=doctor_id,
+            appointment_date=appointment_datetime,
+            reason=reason
+        )
+
+        db.add(new_appointment)
+        db.commit()
+        db.refresh(new_appointment)
+
+        doctor_profile = (
+            db.query(DoctorProfile)
+            .filter(DoctorProfile.user_id == doctor_id)
+            .first()
+        )
+
+        specialization = (
+            doctor_profile.specialization
+            if doctor_profile
+            else "Not available"
+        )
+
+        return (
+            f"Appointment booked successfully.\n"
+            f"Appointment ID: {new_appointment.id}\n"
+            f"Doctor: {doctor.name}\n"
+            f"Specialization: {specialization}\n"
+            f"Date: {new_appointment.appointment_date}\n"
+            f"Reason: {new_appointment.reason}\n"
+            f"Status: {new_appointment.status}"
+        )
+
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     mcp.run()
