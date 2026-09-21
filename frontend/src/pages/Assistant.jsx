@@ -19,9 +19,19 @@ function Assistant() {
       setResponse("");
       setSources([]);
 
-      const result = await api.post("/api/assistant", {
-        message: message,
-      });
+      const token = localStorage.getItem("access_token");
+
+      const result = await api.post(
+        "/api/assistant",
+        {
+          message: message,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       setResponse(result.data.response);
       setSources(result.data.sources || []);

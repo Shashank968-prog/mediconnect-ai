@@ -760,9 +760,13 @@ def verify_otp(
 
 @app.post("/api/assistant")
 def assistant(
-    request: AssistantRequest
+    request: AssistantRequest,
+    current_user: User = Depends(get_current_user)
 ):
-    result = process_ai_request(request.message)
+    result = process_ai_request(
+        request.message,
+        current_user
+    )
 
     return {
         "response": result["answer"],
