@@ -255,10 +255,12 @@ def process_ai_request(message: str, current_user):
         }
 
     if "appointment" in message_lower and (
-        "my" in message_lower
-        or "show" in message_lower
-        or "view" in message_lower
-    ):
+    "my" in message_lower
+    or "show" in message_lower
+    or "view" in message_lower
+    or "what" in message_lower
+    or "have" in message_lower
+):
         if current_user.role != "patient":
             return {
                 "answer": "Only patients can access their appointments through the AI assistant.",

@@ -73,11 +73,18 @@ function Assistant() {
         </form>
 
         {response && (
-          <div>
-            <h2>AI Response</h2>
-            <p>{response}</p>
-          </div>
-        )}
+  <div>
+    <h2>AI Response</h2>
+
+    {response.split("\n\n").map((item, index) => (
+      <div key={index} className="assistant-response">
+        {item.split("\n").map((line, lineIndex) => (
+          <p key={lineIndex}>{line}</p>
+        ))}
+      </div>
+    ))}
+  </div>
+)}
 
         {sources.length > 0 && (
           <div>

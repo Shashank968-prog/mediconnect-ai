@@ -8,3 +8,15 @@ body {
   background-color: #f4f8fb;
   color: #1f2937;
 }
+
+.assistant-response {
+  padding: 16px;
+  margin-top: 12px;
+  border: 1px solid #dbe4ea;
+  border-radius: 8px;
+  background-color: #ffffff;
+}
+
+.assistant-response p {
+  margin: 6px 0;
+}
