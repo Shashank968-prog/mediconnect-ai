@@ -56,8 +56,35 @@ def search_doctors(specialization: str) -> str:
 
 @mcp.tool()
 def get_doctor_details(doctor_id: int) -> str:
-    """Get details for a doctor."""
-    return f"Getting details for doctor with ID {doctor_id}"
+    db = SessionLocal()
+
+    try:
+        result = (
+            db.query(DoctorProfile, User)
+            .join(User, DoctorProfile.user_id == User.id)
+            .filter(
+                User.id == doctor_id,
+                User.role == "doctor",
+                User.is_active == True
+            )
+            .first()
+        )
+
+        if not result:
+            return f"No doctor found with ID: {doctor_id}"
+
+        doctor_profile, user = result
+
+        return (
+            f"Doctor ID: {user.id}\n"
+            f"Name: {user.name}\n"
+            f"Specialization: {doctor_profile.specialization}\n"
+            f"Qualification: {doctor_profile.qualification}\n"
+            f"Experience: {doctor_profile.experience_years} years"
+        )
+
+    finally:
+        db.close()
 
 
 @mcp.tool()
