@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from backend.database import SessionLocal
-from backend.models import DoctorProfile, User
+from backend.models import Appointment, DoctorProfile, User
 
 from mcp.server import MCPServer
 
@@ -89,8 +89,35 @@ def get_doctor_details(doctor_id: int) -> str:
 
 @mcp.tool()
 def get_patient_appointments(patient_id: int) -> str:
-    """Get appointments for a patient."""
-    return f"Getting appointments for patient with ID {patient_id}"
+    db = SessionLocal()
+
+    try:
+        appointments = (
+            db.query(Appointment, User)
+            .join(User, Appointment.doctor_id == User.id)
+            .filter(Appointment.patient_id == patient_id)
+            .order_by(Appointment.appointment_date)
+            .all()
+        )
+
+        if not appointments:
+            return f"No appointments found for patient ID: {patient_id}"
+
+        results = []
+
+        for appointment, doctor in appointments:
+            results.append(
+                f"Appointment ID: {appointment.id}\n"
+                f"Doctor: {doctor.name}\n"
+                f"Date: {appointment.appointment_date}\n"
+                f"Reason: {appointment.reason}\n"
+                f"Status: {appointment.status}"
+            )
+
+        return "\n\n".join(results)
+
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":
