@@ -2,12 +2,15 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+sys.path.append(
+    str(Path(__file__).resolve().parent.parent)
+)
 
 from backend.database import SessionLocal
 from backend.models import Appointment, DoctorProfile, User
 
 from mcp.server import MCPServer
+
 
 mcp = MCPServer("MediConnect Healthcare Server")
 
@@ -19,11 +22,15 @@ def search_doctors(specialization: str) -> str:
     try:
         doctors = (
             db.query(DoctorProfile, User)
-            .join(User, DoctorProfile.user_id == User.id)
+            .join(
+                User,
+                DoctorProfile.user_id == User.id
+            )
             .filter(
                 DoctorProfile.specialization.ilike(
                     f"%{specialization}%"
                 ),
+                DoctorProfile.verification_status == "approved",
                 User.role == "doctor",
                 User.is_active == True
             )
@@ -31,16 +38,22 @@ def search_doctors(specialization: str) -> str:
         )
 
         if not doctors:
-            return f"No doctors found for specialization: {specialization}"
+            return (
+                f"No doctors found for specialization: "
+                f"{specialization}"
+            )
 
         results = []
 
         for doctor_profile, user in doctors:
             results.append(
                 f"Doctor: {user.name}, "
-                f"Specialization: {doctor_profile.specialization}, "
-                f"Qualification: {doctor_profile.qualification}, "
-                f"Experience: {doctor_profile.experience_years} years, "
+                f"Specialization: "
+                f"{doctor_profile.specialization}, "
+                f"Qualification: "
+                f"{doctor_profile.qualification}, "
+                f"Experience: "
+                f"{doctor_profile.experience} years, "
                 f"Doctor ID: {user.id}"
             )
 
@@ -62,26 +75,36 @@ def get_doctor_details(doctor_id: int) -> str:
     try:
         result = (
             db.query(DoctorProfile, User)
-            .join(User, DoctorProfile.user_id == User.id)
+            .join(
+                User,
+                DoctorProfile.user_id == User.id
+            )
             .filter(
                 User.id == doctor_id,
                 User.role == "doctor",
-                User.is_active == True
+                User.is_active == True,
+                DoctorProfile.verification_status == "approved"
             )
             .first()
         )
 
         if not result:
-            return f"No doctor found with ID: {doctor_id}"
+            return (
+                f"No doctor found with ID: "
+                f"{doctor_id}"
+            )
 
         doctor_profile, user = result
 
         return (
             f"Doctor ID: {user.id}\n"
             f"Name: {user.name}\n"
-            f"Specialization: {doctor_profile.specialization}\n"
-            f"Qualification: {doctor_profile.qualification}\n"
-            f"Experience: {doctor_profile.experience_years} years"
+            f"Specialization: "
+            f"{doctor_profile.specialization}\n"
+            f"Qualification: "
+            f"{doctor_profile.qualification}\n"
+            f"Experience: "
+            f"{doctor_profile.experience} years"
         )
 
     finally:
@@ -95,14 +118,24 @@ def get_patient_appointments(patient_id: int) -> str:
     try:
         appointments = (
             db.query(Appointment, User)
-            .join(User, Appointment.doctor_id == User.id)
-            .filter(Appointment.patient_id == patient_id)
-            .order_by(Appointment.appointment_date)
+            .join(
+                User,
+                Appointment.doctor_id == User.id
+            )
+            .filter(
+                Appointment.patient_id == patient_id
+            )
+            .order_by(
+                Appointment.appointment_date
+            )
             .all()
         )
 
         if not appointments:
-            return f"No appointments found for patient ID: {patient_id}"
+            return (
+                f"No appointments found for "
+                f"patient ID: {patient_id}"
+            )
 
         results = []
 
@@ -110,7 +143,8 @@ def get_patient_appointments(patient_id: int) -> str:
             results.append(
                 f"Appointment ID: {appointment.id}\n"
                 f"Doctor: {doctor.name}\n"
-                f"Date: {appointment.appointment_date}\n"
+                f"Date: "
+                f"{appointment.appointment_date}\n"
                 f"Reason: {appointment.reason}\n"
                 f"Status: {appointment.status}"
             )
@@ -122,7 +156,10 @@ def get_patient_appointments(patient_id: int) -> str:
 
 
 @mcp.tool()
-def cancel_patient_appointment(patient_id: int, appointment_id: int) -> str:
+def cancel_patient_appointment(
+    patient_id: int,
+    appointment_id: int
+) -> str:
     db = SessionLocal()
 
     try:
@@ -136,23 +173,31 @@ def cancel_patient_appointment(patient_id: int, appointment_id: int) -> str:
         )
 
         if not appointment:
-            return "Appointment not found or you do not have permission to cancel it."
+            return (
+                "Appointment not found or you do not "
+                "have permission to cancel it."
+            )
 
         if appointment.status == "cancelled":
             return "This appointment is already cancelled."
 
         if appointment.status == "completed":
-            return "Completed appointments cannot be cancelled."
+            return (
+                "Completed appointments cannot be cancelled."
+            )
 
         appointment.status = "cancelled"
+
         db.commit()
 
         return (
-            f"Appointment {appointment.id} has been cancelled successfully."
+            f"Appointment {appointment.id} has been "
+            f"cancelled successfully."
         )
 
     finally:
         db.close()
+
 
 @mcp.tool()
 def book_appointment(
@@ -164,11 +209,17 @@ def book_appointment(
     db = SessionLocal()
 
     try:
-        if not db.query(User).filter(
-            User.id == patient_id,
-            User.role == "patient",
-            User.is_active == True
-        ).first():
+        patient = (
+            db.query(User)
+            .filter(
+                User.id == patient_id,
+                User.role == "patient",
+                User.is_active == True
+            )
+            .first()
+        )
+
+        if not patient:
             return "Patient not found or inactive."
 
         doctor = (
@@ -184,6 +235,18 @@ def book_appointment(
         if not doctor:
             return "Doctor not found."
 
+        doctor_profile = (
+            db.query(DoctorProfile)
+            .filter(
+                DoctorProfile.user_id == doctor_id,
+                DoctorProfile.verification_status == "approved"
+            )
+            .first()
+        )
+
+        if not doctor_profile:
+            return "Doctor is not verified."
+
         try:
             appointment_datetime = datetime.fromisoformat(
                 appointment_date
@@ -192,20 +255,26 @@ def book_appointment(
             return "Invalid appointment date format."
 
         if appointment_datetime <= datetime.utcnow():
-            return "Appointment date must be in the future."
+            return (
+                "Appointment date must be in the future."
+            )
 
         existing_appointment = (
             db.query(Appointment)
             .filter(
                 Appointment.doctor_id == doctor_id,
-                Appointment.appointment_date == appointment_datetime,
+                Appointment.appointment_date ==
+                appointment_datetime,
                 Appointment.status != "cancelled"
             )
             .first()
         )
 
         if existing_appointment:
-            return "This doctor is already booked for the selected time."
+            return (
+                "This doctor is already booked for "
+                "the selected time."
+            )
 
         new_appointment = Appointment(
             patient_id=patient_id,
@@ -215,33 +284,26 @@ def book_appointment(
         )
 
         db.add(new_appointment)
+
         db.commit()
+
         db.refresh(new_appointment)
-
-        doctor_profile = (
-            db.query(DoctorProfile)
-            .filter(DoctorProfile.user_id == doctor_id)
-            .first()
-        )
-
-        specialization = (
-            doctor_profile.specialization
-            if doctor_profile
-            else "Not available"
-        )
 
         return (
             f"Appointment booked successfully.\n"
             f"Appointment ID: {new_appointment.id}\n"
             f"Doctor: {doctor.name}\n"
-            f"Specialization: {specialization}\n"
-            f"Date: {new_appointment.appointment_date}\n"
+            f"Specialization: "
+            f"{doctor_profile.specialization}\n"
+            f"Date: "
+            f"{new_appointment.appointment_date}\n"
             f"Reason: {new_appointment.reason}\n"
             f"Status: {new_appointment.status}"
         )
 
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     mcp.run()

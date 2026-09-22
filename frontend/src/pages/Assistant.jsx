@@ -19,12 +19,17 @@ function Assistant() {
       setResponse("");
       setSources([]);
 
-      const token = localStorage.getItem("access_token");
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        setResponse("Please login to use the AI assistant.");
+        return;
+      }
 
       const result = await api.post(
         "/api/assistant",
         {
-          message: message,
+          message: message.trim(),
         },
         {
           headers: {
@@ -47,57 +52,83 @@ function Assistant() {
 
   return (
     <main className="dashboard-page">
-      <section className="dashboard-card">
-        <h1>AI Health Assistant</h1>
+      <div className="dashboard-container">
+        <section className="dashboard-card">
+          <p className="dashboard-tag">MEDICONNECT AI</p>
 
-        <p>
-          Ask the MediConnect AI assistant a healthcare-related question.
-        </p>
+          <h1>AI Health Assistant</h1>
 
-        <form onSubmit={handleAsk}>
-          <div className="form-group">
-            <label>Ask your question</label>
+          <p>
+            Ask healthcare questions, search for doctors, manage
+            appointments, or get information from the healthcare
+            knowledge base.
+          </p>
 
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder="For example: What are the common symptoms of diabetes?"
-              rows="5"
-              required
-            />
-          </div>
+          <form className="auth-form" onSubmit={handleAsk}>
+            <div className="form-group">
+              <label htmlFor="assistant-message">
+                Ask your question
+              </label>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Thinking..." : "Ask AI"}
-          </button>
-        </form>
+              <textarea
+                id="assistant-message"
+                value={message}
+                onChange={(event) =>
+                  setMessage(event.target.value)
+                }
+                placeholder="For example: What are the common symptoms of diabetes?"
+                rows="5"
+                required
+              />
+            </div>
 
-        {response && (
-  <div>
-    <h2>AI Response</h2>
+            <button
+              className="auth-submit"
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? "Thinking..." : "Ask AI"}
+            </button>
+          </form>
 
-    {response.split("\n\n").map((item, index) => (
-      <div key={index} className="assistant-response">
-        {item.split("\n").map((line, lineIndex) => (
-          <p key={lineIndex}>{line}</p>
-        ))}
+          {response && (
+            <section className="assistant-result">
+              <h2>AI Response</h2>
+
+              <div className="assistant-response">
+                {response.split("\n").map((line, index) => (
+                  <p key={index}>
+                    {line || "\u00A0"}
+                  </p>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {sources.length > 0 && (
+            <section className="assistant-sources">
+              <h2>Sources</h2>
+
+              {sources.map((source, index) => (
+                <div
+                  className="assistant-source"
+                  key={`${source.source}-${source.page}-${index}`}
+                >
+                  <p>
+                    📄 <strong>Document:</strong>{" "}
+                    {source.source}
+                  </p>
+
+                  <p>
+                    <strong>Page:</strong>{" "}
+                    {source.page + 1}
+                  </p>
+                </div>
+              ))}
+            </section>
+          )}
+        </section>
       </div>
-    ))}
-  </div>
-)}
-
-        {sources.length > 0 && (
-          <div>
-            <h2>Sources</h2>
-
-            {sources.map((source, index) => (
-              <p key={index}>
-                📄 {source.source} — Page {source.page + 1}
-              </p>
-            ))}
-          </div>
-        )}
-      </section>
     </main>
   );
 }
