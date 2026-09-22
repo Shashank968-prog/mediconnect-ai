@@ -22,7 +22,6 @@ class UserCreate(BaseModel):
     experience: int | None = None
     license_number: str | None = None
     consultation_fee: float | None = None
-
     
 class UserResponse(BaseModel):
     id: int
