@@ -754,6 +754,24 @@ def reset_password(
             detail="User account not found."
         )
 
+    password_pattern = (
+        r"^(?=.*[a-z])"
+        r"(?=.*[A-Z])"
+        r"(?=.*\d)"
+        r"(?=.*[^A-Za-z0-9])"
+        r".{8,128}$"
+    )
+
+    if not re.match(password_pattern, request.new_password):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Password must contain at least 8 characters, "
+                "one uppercase letter, one lowercase letter, "
+                "one number, and one special character."
+            )
+        )
+
     reset_otp = (
         db.query(PasswordResetOTP)
         .filter(
@@ -805,6 +823,7 @@ def reset_password(
     return {
         "message": "Password reset successfully."
     }
+
 
 @app.post("/api/verify-otp")
 def verify_otp(

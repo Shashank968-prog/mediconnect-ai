@@ -75,6 +75,8 @@ class DoctorProfile(Base):
         "User",
         back_populates="doctor_profile"
     )
+
+
 class Appointment(Base):
     __tablename__ = "appointments"
 

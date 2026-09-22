@@ -40,6 +40,16 @@ function ForgotPassword() {
   const handleResetPassword = async (event) => {
     event.preventDefault();
 
+    const passwordPattern =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,128}$/;
+
+    if (!passwordPattern.test(newPassword)) {
+      setMessage(
+        "Password must contain at least 8 characters, one uppercase letter, one lowercase letter, one number, and one special character."
+      );
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setMessage("Passwords do not match.");
       return;
@@ -116,6 +126,7 @@ function ForgotPassword() {
                   onChange={(event) => setOtp(event.target.value)}
                   placeholder="Enter 6-digit OTP"
                   maxLength="6"
+                  pattern="[0-9]{6}"
                   required
                 />
               </div>
@@ -130,8 +141,24 @@ function ForgotPassword() {
                     setNewPassword(event.target.value)
                   }
                   placeholder="Enter new password"
+                  minLength={8}
+                  maxLength={128}
                   required
                 />
+
+                <small>
+                  Password must contain:
+                  <br />
+                  • At least 8 characters
+                  <br />
+                  • One uppercase letter
+                  <br />
+                  • One lowercase letter
+                  <br />
+                  • One number
+                  <br />
+                  • One special character
+                </small>
               </div>
 
               <div className="form-group">
@@ -144,6 +171,8 @@ function ForgotPassword() {
                     setConfirmPassword(event.target.value)
                   }
                   placeholder="Confirm new password"
+                  minLength={8}
+                  maxLength={128}
                   required
                 />
               </div>
