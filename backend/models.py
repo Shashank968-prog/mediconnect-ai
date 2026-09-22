@@ -23,7 +23,7 @@ Base = declarative_base()
 
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String,Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from pydantic import BaseModel
@@ -58,24 +58,23 @@ class DoctorProfile(Base):
     __tablename__ = "doctor_profiles"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
 
-    user_id = Column(
-        Integer,
-        ForeignKey("users.id"),
-        unique=True,
+    specialization = Column(String, nullable=False)
+    qualification = Column(String, nullable=False)
+    experience = Column(Integer, nullable=False)
+    license_number = Column(String, unique=True, nullable=False)
+    consultation_fee = Column(Float, nullable=False)
+    verification_status = Column(
+        String,
+        default="pending",
         nullable=False
     )
-
-    specialization = Column(String(100), nullable=False)
-    qualification = Column(String(150), nullable=False)
-    experience_years = Column(Integer, nullable=False)
 
     user = relationship(
         "User",
         back_populates="doctor_profile"
     )
-
-
 class Appointment(Base):
     __tablename__ = "appointments"
 

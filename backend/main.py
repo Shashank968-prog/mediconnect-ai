@@ -5,14 +5,19 @@ import random
 import secrets
 
 from dotenv import load_dotenv
+
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+
 from pwdlib import PasswordHash
+
 from sqlalchemy.orm import Session
 
 from backend.database import Base, engine, get_db
+
 from backend.models import (
     Appointment,
     DoctorProfile,
@@ -20,6 +25,7 @@ from backend.models import (
     PasswordResetToken,
     User,
 )
+
 from backend.schemas import (
     AppointmentCreate,
     AppointmentResponse,
@@ -36,10 +42,15 @@ from backend.schemas import (
     PasswordChangeRequest,
     AssistantRequest,
 )
+
 from backend.security import hash_password, verify_password
+
 from backend.auth import create_access_token, get_current_user, require_admin
+
 from backend.ai_service import ask_gemini
+
 from backend.ai_orchestrator import process_ai_request
+
 from rag.rag_service import ask_rag
 
 load_dotenv()
@@ -111,18 +122,51 @@ def register_user(
             detail="Email is already registered"
         )
 
+    if user.role not in ["patient", "doctor"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid role"
+        )
+
+    if user.role == "doctor":
+        if not all([
+            user.specialization,
+            user.qualification,
+            user.experience is not None,
+            user.license_number,
+            user.consultation_fee is not None
+        ]):
+            raise HTTPException(
+                status_code=400,
+                detail="All doctor details are required"
+            )
+
     hashed_password = hash_password(user.password)
 
     new_user = User(
         name=user.name,
         email=user.email,
         password=hashed_password,
-        role="patient"
+        role=user.role
     )
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    if user.role == "doctor":
+        doctor_profile = DoctorProfile(
+            user_id=new_user.id,
+            specialization=user.specialization,
+            qualification=user.qualification,
+            experience=user.experience,
+            license_number=user.license_number,
+            consultation_fee=user.consultation_fee,
+            verification_status="pending"
+        )
+
+        db.add(doctor_profile)
+        db.commit()
 
     return new_user
 

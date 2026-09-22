@@ -6,19 +6,18 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class UserCreate(BaseModel):
-    name: str = Field(
-        min_length=2,
-        max_length=100
-    )
+    name: str
+    email: EmailStr
+    password: str
+    role: str = "patient"
 
-    email: EmailStr = Field(
-        max_length=255
-    )
+    specialization: str | None = None
+    qualification: str | None = None
+    experience: int | None = None
+    license_number: str | None = None
+    consultation_fee: float | None = None
 
-    password: str = Field(
-        min_length=8,
-        description="Password must contain at least 8 characters"
-    )
+    
 class UserResponse(BaseModel):
     id: int
     name: str
