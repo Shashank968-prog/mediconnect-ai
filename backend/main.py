@@ -344,19 +344,18 @@ def create_appointment(
         )
 
     return {
-        "id": new_appointment.id,
-        "patient_id": new_appointment.patient_id,
-        "doctor_id": new_appointment.doctor_id,
-        "appointment_date": new_appointment.appointment_date,
-        "reason": new_appointment.reason,
-        "status": new_appointment.status,
-        "doctor_name": doctor.name,
-        "specialization": doctor_profile.specialization,
-        "qualification": doctor_profile.qualification,
-        "experience_years": doctor_profile.experience_years
-    }
-
-
+    "id": new_appointment.id,
+    "patient_id": new_appointment.patient_id,
+    "doctor_id": new_appointment.doctor_id,
+    "appointment_date": new_appointment.appointment_date,
+    "reason": new_appointment.reason,
+    "status": new_appointment.status,
+    "created_at": new_appointment.created_at,
+    "doctor_name": doctor.name,
+    "specialization": doctor_profile.specialization,
+    "qualification": doctor_profile.qualification,
+    "experience_years": doctor_profile.experience
+}
 @app.patch(
     "/api/appointments/{appointment_id}/status",
     response_model=AppointmentResponse
@@ -487,7 +486,7 @@ def get_appointments(
                 doctor_name=doctor.name,
                 specialization=doctor_profile.specialization,
                 qualification=doctor_profile.qualification,
-                experience_years=doctor_profile.experience_years
+                experience_years=doctor_profile.experience
             )
         )
 

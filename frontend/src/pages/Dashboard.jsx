@@ -3,11 +3,18 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
 function Dashboard() {
-  const [user, setUser] = useState(null);
-  const [appointments, setAppointments] = useState([]);
-  const [message, setMessage] = useState("");
-
   const navigate = useNavigate();
+
+  const [user, setUser] = useState(null);
+  const [doctors, setDoctors] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+
+  const [selectedDoctor, setSelectedDoctor] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [reason, setReason] = useState("");
+
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const token = localStorage.getItem("token");
 
@@ -17,40 +24,58 @@ function Dashboard() {
       return;
     }
 
-    fetchDashboard();
+    loadDashboard();
   }, []);
 
-  const fetchDashboard = async () => {
+  const loadDashboard = async () => {
     try {
-      const response = await api.get("/api/profile", {
+      const profileResponse = await api.get("/api/profile", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      setUser(response.data);
+      setUser(profileResponse.data);
 
-      if (response.data.role === "doctor") {
-        const appointmentResponse = await api.get("/api/appointments", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      const doctorResponse = await api.get("/api/doctors", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        setAppointments(appointmentResponse.data);
-      }
+      setDoctors(doctorResponse.data);
+
+      const appointmentResponse = await api.get("/api/appointments", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setAppointments(appointmentResponse.data);
     } catch (error) {
       console.error(error);
-      setMessage("Unable to load dashboard.");
+
+      setMessage(
+        error.response?.data?.detail ||
+          "Unable to load dashboard."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-  const updateAppointmentStatus = async (appointmentId, status) => {
+  const handleBookAppointment = async (event) => {
+    event.preventDefault();
+
     try {
-      await api.patch(
-        `/api/appointments/${appointmentId}/status`,
+      setMessage("");
+
+      await api.post(
+        "/api/appointments",
         {
-          status,
+          doctor_id: Number(selectedDoctor),
+          appointment_date: appointmentDate,
+          reason,
         },
         {
           headers: {
@@ -59,15 +84,17 @@ function Dashboard() {
         }
       );
 
-      setMessage("Appointment status updated successfully.");
+      setMessage("Appointment booked successfully.");
 
-      fetchDashboard();
+      setSelectedDoctor("");
+      setAppointmentDate("");
+      setReason("");
+
+      loadDashboard();
     } catch (error) {
-      console.error(error);
-
       setMessage(
         error.response?.data?.detail ||
-          "Unable to update appointment status."
+          "Unable to book appointment."
       );
     }
   };
@@ -77,7 +104,7 @@ function Dashboard() {
     navigate("/login");
   };
 
-  if (!user) {
+  if (loading) {
     return (
       <main className="dashboard-page">
         <div className="dashboard-container">
@@ -90,18 +117,20 @@ function Dashboard() {
   return (
     <main className="dashboard-page">
       <div className="dashboard-container">
+
         <section className="dashboard-header">
           <div>
             <p className="dashboard-tag">MEDICONNECT AI</p>
 
-            <h1>Welcome, {user.name}</h1>
+            <h1>Welcome, {user?.name}</h1>
 
             <p>
-              Manage your patient appointments and healthcare activities.
+              Manage your healthcare appointments and connect
+              with doctors.
             </p>
 
             <p>
-              Email: {user.email} | Role: {user.role}
+              Email: {user?.email} | Role: {user?.role}
             </p>
           </div>
 
@@ -114,7 +143,82 @@ function Dashboard() {
         </section>
 
         <section className="dashboard-card">
-          <h2>Patient Appointments</h2>
+          <h2>Book an Appointment</h2>
+
+          <form
+            className="auth-form"
+            onSubmit={handleBookAppointment}
+          >
+            <div className="form-group">
+              <label>Select Doctor</label>
+
+              <select
+                value={selectedDoctor}
+                onChange={(event) =>
+                  setSelectedDoctor(event.target.value)
+                }
+                required
+              >
+                <option value="">
+                  Select a doctor
+                </option>
+
+                {doctors.map((doctor) => (
+                  <option
+                    key={doctor.id}
+                    value={doctor.user_id}
+                  >
+                    Dr. {doctor.user?.name} -{" "}
+                    {doctor.specialization}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Appointment Date & Time</label>
+
+              <input
+                type="datetime-local"
+                value={appointmentDate}
+                onChange={(event) =>
+                  setAppointmentDate(event.target.value)
+                }
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Reason for Consultation</label>
+
+              <textarea
+                value={reason}
+                onChange={(event) =>
+                  setReason(event.target.value)
+                }
+                placeholder="Describe the reason for your appointment"
+                rows="4"
+                required
+              />
+            </div>
+
+            <button
+              className="auth-submit"
+              type="submit"
+            >
+              Book Appointment
+            </button>
+          </form>
+
+          {message && (
+            <p className="dashboard-message">
+              {message}
+            </p>
+          )}
+        </section>
+
+        <section className="dashboard-card">
+          <h2>My Appointments</h2>
 
           {appointments.length === 0 ? (
             <p>You don't have any appointments yet.</p>
@@ -125,82 +229,32 @@ function Dashboard() {
                   className="appointment-card"
                   key={appointment.id}
                 >
-                  <div>
-                    <h3>
-                      Appointment #{appointment.id}
-                    </h3>
+                  <h3>
+                    Appointment #{appointment.id}
+                  </h3>
 
-                    <p>
-                      <strong>Date:</strong>{" "}
-                      {new Date(
-                        appointment.appointment_date
-                      ).toLocaleString()}
-                    </p>
+                  <p>
+                    <strong>Date:</strong>{" "}
+                    {new Date(
+                      appointment.appointment_date
+                    ).toLocaleString()}
+                  </p>
 
-                    <p>
-                      <strong>Reason:</strong>{" "}
-                      {appointment.reason}
-                    </p>
+                  <p>
+                    <strong>Reason:</strong>{" "}
+                    {appointment.reason}
+                  </p>
 
-                    <p>
-                      <strong>Status:</strong>{" "}
-                      <span className="appointment-status">
-                        {appointment.status}
-                      </span>
-                    </p>
-                  </div>
-
-                  <div className="appointment-actions">
-                    {appointment.status === "pending" && (
-                      <>
-                        <button
-                          onClick={() =>
-                            updateAppointmentStatus(
-                              appointment.id,
-                              "approved"
-                            )
-                          }
-                        >
-                          Approve
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            updateAppointmentStatus(
-                              appointment.id,
-                              "cancelled"
-                            )
-                          }
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-
-                    {appointment.status === "approved" && (
-                      <button
-                        onClick={() =>
-                          updateAppointmentStatus(
-                            appointment.id,
-                            "completed"
-                          )
-                        }
-                      >
-                        Mark Completed
-                      </button>
-                    )}
-                  </div>
+                  <p>
+                    <strong>Status:</strong>{" "}
+                    {appointment.status}
+                  </p>
                 </div>
               ))}
             </div>
           )}
-
-          {message && (
-            <p className="dashboard-message">
-              {message}
-            </p>
-          )}
         </section>
+
       </div>
     </main>
   );

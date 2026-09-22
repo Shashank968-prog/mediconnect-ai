@@ -669,3 +669,19 @@
     grid-template-columns: 1fr;
   }
 }
+
+.dashboard-logout {
+  border: none;
+  background: #d9534f;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.dashboard-logout:hover {
+  background: #c94440;
+}

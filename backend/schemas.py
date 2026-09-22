@@ -51,7 +51,8 @@ class DoctorProfileResponse(BaseModel):
     user_id: int
     specialization: str
     qualification: str
-    experience_years: int
+    experience: int
+    user: UserResponse
 
     class Config:
         from_attributes = True
