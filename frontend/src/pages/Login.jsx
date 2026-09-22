@@ -40,7 +40,9 @@ function Login() {
 
       const role = profileResponse.data.role;
 
-      if (role === "doctor") {
+      if (role === "admin") {
+        navigate("/admin-dashboard");
+      } else if (role === "doctor") {
         navigate("/doctor-dashboard");
       } else {
         navigate("/dashboard");

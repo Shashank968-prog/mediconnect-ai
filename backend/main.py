@@ -41,6 +41,7 @@ from backend.schemas import (
     VerifyOTPRequest,
     PasswordChangeRequest,
     AssistantRequest,
+    DoctorVerificationRequest,
 )
 
 from backend.security import hash_password, verify_password
@@ -356,6 +357,8 @@ def create_appointment(
     "qualification": doctor_profile.qualification,
     "experience_years": doctor_profile.experience
 }
+
+
 @app.patch(
     "/api/appointments/{appointment_id}/status",
     response_model=AppointmentResponse
@@ -577,13 +580,35 @@ def get_all_doctors(
     doctor_profiles = (
         db.query(DoctorProfile)
         .join(User, DoctorProfile.user_id == User.id)
-        .filter(User.role == "doctor")
+        .filter(
+            User.role == "doctor",
+            DoctorProfile.verification_status == "approved"
+        )
         .offset(skip)
         .limit(limit)
         .all()
     )
 
     return doctor_profiles
+
+
+@app.get(
+    "/api/admin/doctors/pending",
+    response_model=list[DoctorProfileResponse]
+)
+def get_pending_doctors(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    doctors = (
+        db.query(DoctorProfile)
+        .filter(
+            DoctorProfile.verification_status == "pending"
+        )
+        .all()
+    )
+
+    return doctors
 
 
 @app.patch("/api/change-password")
@@ -839,3 +864,47 @@ def assistant(
         "response": result["answer"],
         "sources": result["sources"]
     }
+
+
+@app.patch(
+    "/api/admin/doctors/{doctor_profile_id}/verify",
+    response_model=DoctorProfileResponse
+)
+def verify_doctor(
+    doctor_profile_id: int,
+    verification: DoctorVerificationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    if verification.verification_status not in ["approved", "rejected"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Verification status must be approved or rejected"
+        )
+
+    doctor_profile = (
+        db.query(DoctorProfile)
+        .filter(DoctorProfile.id == doctor_profile_id)
+        .first()
+    )
+
+    if not doctor_profile:
+        raise HTTPException(
+            status_code=404,
+            detail="Doctor profile not found"
+        )
+
+    if doctor_profile.verification_status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail="Doctor profile has already been processed"
+        )
+
+    doctor_profile.verification_status = (
+        verification.verification_status
+    )
+
+    db.commit()
+    db.refresh(doctor_profile)
+
+    return doctor_profile

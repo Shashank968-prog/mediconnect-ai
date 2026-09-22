@@ -11,6 +11,7 @@ import Doctors from "./pages/Doctors";
 import BookAppointment from "./pages/BookAppointment";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import Assistant from "./pages/Assistant";
+import AdminDashboard from "./pages/AdminDashboard";
 import "./App.css";
 
 function App() {
@@ -51,6 +52,11 @@ function App() {
         <Route
           path="/assistant"
           element={<Assistant />}
+        />
+
+        <Route
+          path="/admin-dashboard"
+          element={<AdminDashboard />}
         />
       </Routes>
     </BrowserRouter>

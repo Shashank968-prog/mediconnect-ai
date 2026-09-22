@@ -4,13 +4,14 @@ import api from "../services/api";
 
 function DoctorDashboard() {
   const navigate = useNavigate();
+
   const [user, setUser] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("token");
 
     if (!token) {
       navigate("/login");
@@ -50,7 +51,7 @@ function DoctorDashboard() {
   }, [navigate]);
 
   const updateAppointmentStatus = async (appointmentId, status) => {
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("token");
 
     if (!token) {
       navigate("/login");
@@ -93,7 +94,7 @@ function DoctorDashboard() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("access_token");
+    localStorage.removeItem("token");
     navigate("/login");
   };
 

@@ -119,3 +119,7 @@ class VerifyOTPRequest(BaseModel):
 
 class AssistantRequest(BaseModel):
     message: str
+
+
+class DoctorVerificationRequest(BaseModel):
+    verification_status: str
