@@ -36,7 +36,9 @@ function Register() {
           role === "doctor" ? Number(consultationFee) : null,
       });
 
-      setMessage("Registration successful! Redirecting to login...");
+      setMessage(
+        "Registration successful! Redirecting to login..."
+      );
 
       setTimeout(() => {
         navigate("/login");
@@ -64,8 +66,8 @@ function Register() {
           </h1>
 
           <p>
-            Create your account to book appointments, discover doctors, and
-            explore intelligent healthcare assistance.
+            Create your account to book appointments, discover doctors,
+            and explore intelligent healthcare assistance.
           </p>
 
           <div className="auth-benefits">
@@ -104,47 +106,74 @@ function Register() {
                 type="text"
                 placeholder="Enter your full name"
                 value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
+                onChange={(event) =>
+                  setFullName(event.target.value)
+                }
                 required
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="registerEmail">Email Address</label>
+              <label htmlFor="registerEmail">
+                Email Address
+              </label>
 
               <input
                 id="registerEmail"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) =>
+                  setEmail(event.target.value)
+                }
                 required
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="registerPassword">Password</label>
+              <label htmlFor="registerPassword">
+                Password
+              </label>
 
               <input
                 id="registerPassword"
                 type="password"
                 placeholder="Create a password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) =>
+                  setPassword(event.target.value)
+                }
                 minLength={8}
+                maxLength={128}
                 required
               />
 
-              <small>Password must contain at least 8 characters.</small>
+              <small>
+                Password must contain:
+                <br />
+                • At least 8 characters
+                <br />
+                • One uppercase letter
+                <br />
+                • One lowercase letter
+                <br />
+                • One number
+                <br />
+                • One special character
+              </small>
             </div>
 
             <div className="form-group">
-              <label htmlFor="role">Account Type</label>
+              <label htmlFor="role">
+                Account Type
+              </label>
 
               <select
                 id="role"
                 value={role}
-                onChange={(event) => setRole(event.target.value)}
+                onChange={(event) =>
+                  setRole(event.target.value)
+                }
               >
                 <option value="patient">Patient</option>
                 <option value="doctor">Doctor</option>
@@ -154,7 +183,9 @@ function Register() {
             {role === "doctor" && (
               <>
                 <div className="form-group">
-                  <label htmlFor="specialization">Specialization</label>
+                  <label htmlFor="specialization">
+                    Specialization
+                  </label>
 
                   <input
                     id="specialization"
@@ -169,7 +200,9 @@ function Register() {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="qualification">Qualification</label>
+                  <label htmlFor="qualification">
+                    Qualification
+                  </label>
 
                   <input
                     id="qualification"
@@ -184,7 +217,9 @@ function Register() {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="experience">Experience (years)</label>
+                  <label htmlFor="experience">
+                    Experience (years)
+                  </label>
 
                   <input
                     id="experience"
@@ -192,7 +227,9 @@ function Register() {
                     min="0"
                     placeholder="e.g. 5"
                     value={experience}
-                    onChange={(event) => setExperience(event.target.value)}
+                    onChange={(event) =>
+                      setExperience(event.target.value)
+                    }
                     required
                   />
                 </div>
@@ -234,7 +271,10 @@ function Register() {
               </>
             )}
 
-            <button className="auth-submit" type="submit">
+            <button
+              className="auth-submit"
+              type="submit"
+            >
               Create Account
             </button>
           </form>
@@ -242,7 +282,9 @@ function Register() {
           {message && (
             <p
               className={`auth-message ${
-                message.includes("successful") ? "success-message" : ""
+                message.includes("successful")
+                  ? "success-message"
+                  : ""
               }`}
             >
               {message}

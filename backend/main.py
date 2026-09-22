@@ -54,6 +54,8 @@ from backend.ai_orchestrator import process_ai_request
 
 from rag.rag_service import ask_rag
 
+import re
+
 load_dotenv()
 
 mail_config = ConnectionConfig(
@@ -129,6 +131,24 @@ def register_user(
             detail="Invalid role"
         )
 
+    password_pattern = (
+        r"^(?=.*[a-z])"
+        r"(?=.*[A-Z])"
+        r"(?=.*\d)"
+        r"(?=.*[^A-Za-z0-9])"
+        r".{8,128}$"
+    )
+
+    if not re.match(password_pattern, user.password):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Password must contain at least 8 characters, "
+                "one uppercase letter, one lowercase letter, "
+                "one number, and one special character."
+            )
+        )
+
     if user.role == "doctor":
         if not all([
             user.specialization,
@@ -170,6 +190,7 @@ def register_user(
         db.commit()
 
     return new_user
+
 
 
 @app.post("/api/login")
