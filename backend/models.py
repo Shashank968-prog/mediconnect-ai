@@ -1,34 +1,15 @@
-import os
-from pathlib import Path
-
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-
-BASE_DIR = Path(__file__).resolve().parent
-
-load_dotenv(BASE_DIR / ".env")
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-engine = create_engine(DATABASE_URL)
-
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
-
-Base = declarative_base()
-
-from sqlalchemy import Column, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String,Float
-from sqlalchemy.orm import relationship
 from datetime import datetime
-from pydantic import BaseModel
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+)
+from sqlalchemy.orm import relationship
 
 from backend.database import Base
 
@@ -37,15 +18,35 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    password = Column(String(255), nullable=False)
-    role = Column(String(20), nullable=False, default="patient")
+
+    name = Column(
+        String(100),
+        nullable=False
+    )
+
+    email = Column(
+        String(255),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+
+    password = Column(
+        String(255),
+        nullable=False
+    )
+
+    role = Column(
+        String(20),
+        nullable=False,
+        default="patient"
+    )
+
     is_active = Column(
-    Boolean,
-    nullable=False,
-    default=True
-)
+        Boolean,
+        nullable=False,
+        default=True
+    )
 
     doctor_profile = relationship(
         "DoctorProfile",
@@ -53,18 +54,54 @@ class User(Base):
         uselist=False
     )
 
+    documents = relationship(
+        "UserDocument",
+        back_populates="user"
+    )
+
 
 class DoctorProfile(Base):
     __tablename__ = "doctor_profiles"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
-    specialization = Column(String, nullable=False)
-    qualification = Column(String, nullable=False)
-    experience = Column(Integer, nullable=False)
-    license_number = Column(String, unique=True, nullable=False)
-    consultation_fee = Column(Float, nullable=False)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        unique=True,
+        nullable=False
+    )
+
+    specialization = Column(
+        String,
+        nullable=False
+    )
+
+    qualification = Column(
+        String,
+        nullable=False
+    )
+
+    experience = Column(
+        Integer,
+        nullable=False
+    )
+
+    license_number = Column(
+        String,
+        unique=True,
+        nullable=False
+    )
+
+    consultation_fee = Column(
+        Float,
+        nullable=False
+    )
+
     verification_status = Column(
         String,
         default="pending",
@@ -80,7 +117,11 @@ class DoctorProfile(Base):
 class Appointment(Base):
     __tablename__ = "appointments"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
     patient_id = Column(
         Integer,
@@ -126,14 +167,39 @@ class Appointment(Base):
         foreign_keys=[doctor_id]
     )
 
+
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    token = Column(String(255), unique=True, nullable=False, index=True)
-    expires_at = Column(DateTime, nullable=False)
-    used = Column(Boolean, nullable=False, default=False)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    token = Column(
+        String(255),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+
+    expires_at = Column(
+        DateTime,
+        nullable=False
+    )
+
+    used = Column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
 
     user = relationship("User")
 
@@ -141,12 +207,87 @@ class PasswordResetToken(Base):
 class PasswordResetOTP(Base):
     __tablename__ = "password_reset_otps"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    otp_hash = Column(String(255), nullable=False)
-    expires_at = Column(DateTime, nullable=False)
-    attempts = Column(Integer, nullable=False, default=0)
-    used = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    otp_hash = Column(
+        String(255),
+        nullable=False
+    )
+
+    expires_at = Column(
+        DateTime,
+        nullable=False
+    )
+
+    attempts = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    used = Column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
+
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
 
     user = relationship("User")
+
+
+class UserDocument(Base):
+    __tablename__ = "user_documents"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    filename = Column(
+        String(255),
+        nullable=False
+    )
+
+    file_path = Column(
+        String(500),
+        nullable=False
+    )
+
+    chunk_count = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    uploaded_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    user = relationship(
+        "User",
+        back_populates="documents"
+    )

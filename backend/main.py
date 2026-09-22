@@ -24,6 +24,7 @@ from backend.models import (
     PasswordResetOTP,
     PasswordResetToken,
     User,
+    UserDocument,
 )
 
 from backend.schemas import (
@@ -957,7 +958,8 @@ def verify_doctor(
 @app.post("/api/upload-pdf")
 async def upload_pdf(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
@@ -965,7 +967,16 @@ async def upload_pdf(
             detail="Only PDF files are allowed."
         )
 
-    upload_directory = Path("rag/documents")
+    if current_user.role != "patient":
+        raise HTTPException(
+            status_code=403,
+            detail="Only patients can upload healthcare documents."
+        )
+
+    upload_directory = Path(
+        f"rag/documents/user_{current_user.id}"
+    )
+
     upload_directory.mkdir(
         parents=True,
         exist_ok=True
@@ -979,12 +990,26 @@ async def upload_pdf(
         buffer.write(file_content)
 
     try:
-        chunk_count = ingest_pdf(str(file_path))
+        chunk_count = ingest_pdf(
+            str(file_path)
+        )
+
+        document = UserDocument(
+            user_id=current_user.id,
+            filename=file.filename,
+            file_path=str(file_path),
+            chunk_count=chunk_count
+        )
+
+        db.add(document)
+        db.commit()
+        db.refresh(document)
 
         return {
             "message": "PDF uploaded and processed successfully.",
-            "filename": file.filename,
-            "chunks": chunk_count
+            "document_id": document.id,
+            "filename": document.filename,
+            "chunks": document.chunk_count
         }
 
     except Exception as error:
