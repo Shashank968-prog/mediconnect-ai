@@ -52,9 +52,13 @@ from backend.ai_service import ask_gemini
 
 from backend.ai_orchestrator import process_ai_request
 
-from rag.rag_service import ask_rag
+from rag.rag_service import ask_rag, ingest_pdf
 
 import re
+
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+
+from pathlib import Path
 
 load_dotenv()
 
@@ -948,3 +952,46 @@ def verify_doctor(
     db.refresh(doctor_profile)
 
     return doctor_profile
+
+
+@app.post("/api/upload-pdf")
+async def upload_pdf(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed."
+        )
+
+    upload_directory = Path("rag/documents")
+    upload_directory.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    file_path = upload_directory / file.filename
+
+    file_content = await file.read()
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(file_content)
+
+    try:
+        chunk_count = ingest_pdf(str(file_path))
+
+        return {
+            "message": "PDF uploaded and processed successfully.",
+            "filename": file.filename,
+            "chunks": chunk_count
+        }
+
+    except Exception as error:
+        if file_path.exists():
+            file_path.unlink()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to process PDF: {str(error)}"
+        )
