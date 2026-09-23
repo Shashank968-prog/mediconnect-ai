@@ -14,6 +14,7 @@ function Assistant() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [documents, setDocuments] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -46,11 +47,38 @@ function Assistant() {
     }
   };
 
+  const loadDocuments = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        return;
+      }
+
+      const result = await api.get(
+        "/api/documents",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setDocuments(result.data || []);
+    } catch (error) {
+      console.error(
+        "Unable to load documents:",
+        error
+      );
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setHistoryLoading(true);
 
       await loadConversations();
+      await loadDocuments();
 
       setChatHistory([]);
       setSelectedConversation(null);
@@ -112,6 +140,8 @@ function Assistant() {
 
       setSelectedFile(null);
       event.target.reset();
+
+      await loadDocuments();
     } catch (error) {
       setUploadMessage(
         error.response?.data?.detail ||
@@ -123,87 +153,87 @@ function Assistant() {
   };
 
   const handleAsk = async (event) => {
-  event.preventDefault();
+    event.preventDefault();
 
-  if (!message.trim()) {
-    return;
-  }
-
-  const userMessage = message.trim();
-
-  try {
-    setLoading(true);
-    setResponse("");
-    setSources([]);
-
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      setResponse(
-        "Please login to use the AI assistant."
-      );
+    if (!message.trim()) {
       return;
     }
 
-    const result = await api.post(
-      "/api/assistant",
-      {
-        message: userMessage,
-        conversation_id: selectedConversation?.id || null,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    const userMessage = message.trim();
+
+    try {
+      setLoading(true);
+      setResponse("");
+      setSources([]);
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        setResponse(
+          "Please login to use the AI assistant."
+        );
+        return;
       }
-    );
 
-    setResponse(result.data.response);
-    setSources(result.data.sources || []);
+      const result = await api.post(
+        "/api/assistant",
+        {
+          message: userMessage,
+          conversation_id:
+            selectedConversation?.id || null,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-    setChatHistory((previousHistory) => [
-      ...previousHistory,
-      {
-        id: `user-${Date.now()}`,
-        role: "user",
-        message: userMessage,
-        conversation_id:
-          result.data.conversation_id,
-      },
-      {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        message: result.data.response,
-        conversation_id:
-          result.data.conversation_id,
-      },
-    ]);
+      setResponse(result.data.response);
+      setSources(result.data.sources || []);
 
-    setSelectedConversation({
-      id: result.data.conversation_id,
-    });
+      setChatHistory((previousHistory) => [
+        ...previousHistory,
+        {
+          id: `user-${Date.now()}`,
+          role: "user",
+          message: userMessage,
+          conversation_id:
+            result.data.conversation_id,
+        },
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          message: result.data.response,
+          conversation_id:
+            result.data.conversation_id,
+        },
+      ]);
 
-    await loadConversations();
+      setSelectedConversation({
+        id: result.data.conversation_id,
+      });
 
+      await loadConversations();
+
+      setMessage("");
+    } catch (error) {
+      setResponse(
+        error.response?.data?.detail ||
+          "Unable to get a response from the AI assistant."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    setSelectedConversation(null);
+    setChatHistory([]);
+    setResponse("");
+    setSources([]);
     setMessage("");
-  } catch (error) {
-    setResponse(
-      error.response?.data?.detail ||
-        "Unable to get a response from the AI assistant."
-    );
-  } finally {
-    setLoading(false);
-  }
-};
-
-const handleNewChat = () => {
-  setSelectedConversation(null);
-  setChatHistory([]);
-  setResponse("");
-  setSources([]);
-  setMessage("");
-};
-
+  };
 
   const handleConversationClick = async (
     conversation
@@ -245,39 +275,44 @@ const handleNewChat = () => {
     }
   };
 
-  const handleDeleteConversation = async (conversationId) => {
-  try {
-    const token = localStorage.getItem("token");
+  const handleDeleteConversation = async (
+    conversationId
+  ) => {
+    try {
+      const token = localStorage.getItem("token");
 
-    if (!token) {
-      return;
-    }
-
-    await api.delete(
-      `/api/conversations/${conversationId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      if (!token) {
+        return;
       }
-    );
 
-    if (selectedConversation?.id === conversationId) {
-      setSelectedConversation(null);
-      setChatHistory([]);
-      setResponse("");
-      setSources([]);
-      setMessage("");
+      await api.delete(
+        `/api/conversations/${conversationId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (
+        selectedConversation?.id ===
+        conversationId
+      ) {
+        setSelectedConversation(null);
+        setChatHistory([]);
+        setResponse("");
+        setSources([]);
+        setMessage("");
+      }
+
+      await loadConversations();
+    } catch (error) {
+      console.error(
+        "Unable to delete conversation:",
+        error
+      );
     }
-
-    await loadConversations();
-  } catch (error) {
-    console.error(
-      "Unable to delete conversation:",
-      error
-    );
-  }
-};
+  };
 
   const renderMessage = (text) => {
     if (!text) {
@@ -474,6 +509,101 @@ const handleNewChat = () => {
 
         </section>
 
+        <section className="assistant-documents-card">
+
+          <div className="assistant-section-header">
+
+            <div>
+              <span className="assistant-section-icon">
+                📚
+              </span>
+
+              <div>
+                <h2>
+                  My Documents
+                </h2>
+
+                <p>
+                  Your uploaded healthcare
+                  documents
+                </p>
+              </div>
+            </div>
+
+            <span className="document-count">
+              {documents.length}{" "}
+              {documents.length === 1
+                ? "Document"
+                : "Documents"}
+            </span>
+
+          </div>
+
+          {documents.length === 0 ? (
+            <div className="assistant-documents-empty">
+
+              <div className="documents-empty-icon">
+                📄
+              </div>
+
+              <h3>
+                No documents yet
+              </h3>
+
+              <p>
+                Upload a healthcare PDF to
+                start asking questions about it.
+              </p>
+
+            </div>
+          ) : (
+            <div className="assistant-document-list">
+
+              {documents.map((document) => (
+                <div
+                  className="assistant-document-item"
+                  key={document.id}
+                >
+
+                  <div className="document-file-icon">
+                    PDF
+                  </div>
+
+                  <div className="assistant-document-info">
+
+                    <strong>
+                      {document.filename}
+                    </strong>
+
+                    <div className="document-meta">
+
+                      <span>
+                        {document.chunk_count} chunks
+                      </span>
+
+                      <span>
+                        •
+                      </span>
+
+                      <span>
+                        Uploaded{" "}
+                        {new Date(
+                          document.uploaded_at
+                        ).toLocaleDateString()}
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                </div>
+              ))}
+
+            </div>
+          )}
+
+        </section>
+
         <section className="assistant-chat-card">
 
           <div className="assistant-chat-header">
@@ -504,18 +634,21 @@ const handleNewChat = () => {
             <aside className="chat-history-sidebar">
 
               <div className="chat-history-header">
-  <h3>
-    CHAT HISTORY
-  </h3>
 
-  <button
-    type="button"
-    className="new-chat-button"
-    onClick={handleNewChat}
-  >
-    + New Chat
-  </button>
-</div>
+                <h3>
+                  CHAT HISTORY
+                </h3>
+
+                <button
+                  type="button"
+                  className="new-chat-button"
+                  onClick={handleNewChat}
+                >
+                  + New Chat
+                </button>
+
+              </div>
+
               {historyLoading ? (
                 <p className="chat-history-empty">
                   Loading...
@@ -549,37 +682,48 @@ const handleNewChat = () => {
                             conversation
                           ) => (
                             <div
-  className={`chat-history-item-wrapper ${
-    selectedConversation?.id === conversation.id
-      ? "active"
-      : ""
-  }`}
-  key={conversation.id}
->
-  <button
-    type="button"
-    className="chat-history-item"
-    onClick={() =>
-      handleConversationClick(conversation)
-    }
-    disabled={conversationLoading}
-  >
-    {conversation.title}
-  </button>
+                              className={`chat-history-item-wrapper ${
+                                selectedConversation?.id ===
+                                conversation.id
+                                  ? "active"
+                                  : ""
+                              }`}
+                              key={conversation.id}
+                            >
 
-  <button
-    type="button"
-    className="delete-conversation-button"
-    onClick={(event) => {
-      event.stopPropagation();
-      handleDeleteConversation(conversation.id);
-    }}
-    disabled={conversationLoading}
-    title="Delete conversation"
-  >
-    🗑
-  </button>
-</div>
+                              <button
+                                type="button"
+                                className="chat-history-item"
+                                onClick={() =>
+                                  handleConversationClick(
+                                    conversation
+                                  )
+                                }
+                                disabled={
+                                  conversationLoading
+                                }
+                              >
+                                {conversation.title}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="delete-conversation-button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleDeleteConversation(
+                                    conversation.id
+                                  );
+                                }}
+                                disabled={
+                                  conversationLoading
+                                }
+                                title="Delete conversation"
+                              >
+                                🗑
+                              </button>
+
+                            </div>
                           )
                         )}
 
