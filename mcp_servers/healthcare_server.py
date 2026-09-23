@@ -221,30 +221,25 @@ def book_appointment(
         if not patient:
             return "Patient not found or inactive."
 
-        doctor = (
-            db.query(User)
-            .filter(
-                User.id == doctor_id,
-                User.role == "doctor",
-                User.is_active == True
+        result = (
+            db.query(DoctorProfile, User)
+            .join(
+                User,
+                DoctorProfile.user_id == User.id
             )
-            .first()
-        )
-
-        if not doctor:
-            return "Doctor not found."
-
-        doctor_profile = (
-            db.query(DoctorProfile)
             .filter(
-                DoctorProfile.user_id == doctor_id,
+                DoctorProfile.id == doctor_id,
+                User.role == "doctor",
+                User.is_active == True,
                 DoctorProfile.verification_status == "approved"
             )
             .first()
         )
 
-        if not doctor_profile:
-            return "Doctor is not verified."
+        if not result:
+            return "Doctor not found or not verified."
+
+        doctor_profile, doctor = result
 
         try:
             appointment_datetime = datetime.fromisoformat(
@@ -254,14 +249,12 @@ def book_appointment(
             return "Invalid appointment date format."
 
         if appointment_datetime <= datetime.utcnow():
-            return (
-                "Appointment date must be in the future."
-            )
+            return "Appointment date must be in the future."
 
         existing_appointment = (
             db.query(Appointment)
             .filter(
-                Appointment.doctor_id == doctor_id,
+                Appointment.doctor_id == doctor.id,
                 Appointment.appointment_date ==
                 appointment_datetime,
                 Appointment.status != "cancelled"
@@ -277,15 +270,13 @@ def book_appointment(
 
         new_appointment = Appointment(
             patient_id=patient_id,
-            doctor_id=doctor_id,
+            doctor_id=doctor.id,
             appointment_date=appointment_datetime,
             reason=reason
         )
 
         db.add(new_appointment)
-
         db.commit()
-
         db.refresh(new_appointment)
 
         return (
@@ -300,9 +291,11 @@ def book_appointment(
             f"Status: {new_appointment.status}"
         )
 
+    except Exception as error:
+        return f"BOOKING ERROR: {type(error).__name__}: {error}"
+
     finally:
         db.close()
-
 
 if __name__ == "__main__":
     mcp.run()
