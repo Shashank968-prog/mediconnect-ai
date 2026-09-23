@@ -8,16 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
-)
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Text
+    Text,
 )
 from sqlalchemy.orm import relationship
 
@@ -70,9 +61,14 @@ class User(Base):
     )
 
     chat_messages = relationship(
-    "ChatMessage",
-    back_populates="user"
-)
+        "ChatMessage",
+        back_populates="user"
+    )
+
+    conversations = relationship(
+        "Conversation",
+        back_populates="user"
+    )
 
 
 class DoctorProfile(Base):
@@ -307,13 +303,82 @@ class UserDocument(Base):
         back_populates="documents"
     )
 
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    title = Column(
+        String(255),
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+    user = relationship(
+        "User",
+        back_populates="conversations"
+    )
+
+    messages = relationship(
+        "ChatMessage",
+        back_populates="conversation"
+    )
+
+
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role = Column(String(20), nullable=False)
-    message = Column(Text, nullable=False)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    conversation_id = Column(
+        Integer,
+        ForeignKey("conversations.id"),
+        nullable=True
+    )
+
+    role = Column(
+        String(20),
+        nullable=False
+    )
+
+    message = Column(
+        Text,
+        nullable=False
+    )
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
@@ -323,4 +388,9 @@ class ChatMessage(Base):
     user = relationship(
         "User",
         back_populates="chat_messages"
+    )
+
+    conversation = relationship(
+        "Conversation",
+        back_populates="messages"
     )

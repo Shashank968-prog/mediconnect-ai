@@ -25,7 +25,8 @@ from backend.models import (
     PasswordResetToken,
     User,
     UserDocument,
-    ChatMessage
+    ChatMessage,
+    Conversation
 )
 
 from backend.schemas import (
@@ -61,6 +62,7 @@ import re
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 
 from pathlib import Path
+from datetime import datetime
 
 load_dotenv()
 
@@ -902,8 +904,42 @@ def assistant(
         current_user.role
     )
 
+    conversation = None
+
+    if request.conversation_id is not None:
+        conversation = (
+            db.query(Conversation)
+            .filter(
+                Conversation.id == request.conversation_id,
+                Conversation.user_id == current_user.id
+            )
+            .first()
+        )
+
+        if not conversation:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found."
+            )
+
+    else:
+        title = request.message.strip()
+
+        if len(title) > 50:
+            title = title[:50].rsplit(" ", 1)[0] + "..."
+
+        conversation = Conversation(
+            user_id=current_user.id,
+            title=title
+        )
+
+        db.add(conversation)
+        db.commit()
+        db.refresh(conversation)
+
     user_message = ChatMessage(
         user_id=current_user.id,
+        conversation_id=conversation.id,
         role="user",
         message=request.message
     )
@@ -918,14 +954,19 @@ def assistant(
 
     assistant_message = ChatMessage(
         user_id=current_user.id,
+        conversation_id=conversation.id,
         role="assistant",
         message=result["answer"]
     )
 
     db.add(assistant_message)
+
+    conversation.updated_at = datetime.utcnow()
+
     db.commit()
 
     return {
+        "conversation_id": conversation.id,
         "response": result["answer"],
         "sources": result["sources"]
     }
@@ -1042,6 +1083,7 @@ async def upload_pdf(
             detail=f"Unable to process PDF: {str(error)}"
         )
 
+
 @app.get("/api/chat-history")
 def get_chat_history(
     db: Session = Depends(get_db),
@@ -1059,3 +1101,64 @@ def get_chat_history(
     )
 
     return messages
+
+
+@app.get("/api/conversations")
+def get_conversations(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    conversations = (
+        db.query(Conversation)
+        .filter(
+            Conversation.user_id == current_user.id
+        )
+        .order_by(
+            Conversation.updated_at.desc()
+        )
+        .all()
+    )
+
+    return conversations
+
+
+@app.get("/api/conversations/{conversation_id}")
+def get_conversation(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    conversation = (
+        db.query(Conversation)
+        .filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found."
+        )
+
+    messages = (
+        db.query(ChatMessage)
+        .filter(
+            ChatMessage.conversation_id == conversation.id,
+            ChatMessage.user_id == current_user.id
+        )
+        .order_by(
+            ChatMessage.created_at.asc()
+        )
+        .all()
+    )
+
+    return {
+        "id": conversation.id,
+        "title": conversation.title,
+        "created_at": conversation.created_at,
+        "updated_at": conversation.updated_at,
+        "messages": messages
+    }

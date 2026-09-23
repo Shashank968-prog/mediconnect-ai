@@ -5,7 +5,11 @@ function Assistant() {
   const [message, setMessage] = useState("");
   const [response, setResponse] = useState("");
   const [sources, setSources] = useState([]);
+
   const [chatHistory, setChatHistory] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [selectedConversation, setSelectedConversation] =
+    useState(null);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
@@ -13,47 +17,66 @@ function Assistant() {
 
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [conversationLoading, setConversationLoading] =
+    useState(false);
+
+  const loadConversations = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        return;
+      }
+
+      const result = await api.get(
+        "/api/conversations",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setConversations(result.data || []);
+    } catch (error) {
+      console.error(
+        "Unable to load conversations:",
+        error
+      );
+    }
+  };
 
   useEffect(() => {
-    const loadChatHistory = async () => {
-      try {
-        const token = localStorage.getItem("token");
+    const loadData = async () => {
+      setHistoryLoading(true);
 
-        if (!token) {
-          setHistoryLoading(false);
-          return;
-        }
+      await loadConversations();
 
-        const result = await api.get(
-          "/api/chat-history",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+      setChatHistory([]);
+      setSelectedConversation(null);
+      setResponse("");
+      setSources([]);
 
-        setChatHistory(result.data || []);
-      } catch (error) {
-        console.error("Unable to load chat history:", error);
-      } finally {
-        setHistoryLoading(false);
-      }
+      setHistoryLoading(false);
     };
 
-    loadChatHistory();
+    loadData();
   }, []);
 
   const handleUpload = async (event) => {
     event.preventDefault();
 
     if (!selectedFile) {
-      setUploadMessage("Please select a PDF file.");
+      setUploadMessage(
+        "Please select a PDF file."
+      );
       return;
     }
 
     if (selectedFile.type !== "application/pdf") {
-      setUploadMessage("Only PDF files are allowed.");
+      setUploadMessage(
+        "Only PDF files are allowed."
+      );
       return;
     }
 
@@ -64,7 +87,9 @@ function Assistant() {
       const token = localStorage.getItem("token");
 
       if (!token) {
-        setUploadMessage("Please login to upload a PDF.");
+        setUploadMessage(
+          "Please login to upload a PDF."
+        );
         return;
       }
 
@@ -98,31 +123,93 @@ function Assistant() {
   };
 
   const handleAsk = async (event) => {
-    event.preventDefault();
+  event.preventDefault();
 
-    if (!message.trim()) {
+  if (!message.trim()) {
+    return;
+  }
+
+  const userMessage = message.trim();
+
+  try {
+    setLoading(true);
+    setResponse("");
+    setSources([]);
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      setResponse(
+        "Please login to use the AI assistant."
+      );
       return;
     }
 
-    const userMessage = message.trim();
+    const result = await api.post(
+      "/api/assistant",
+      {
+        message: userMessage,
+        conversation_id: selectedConversation?.id || null,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
+    setResponse(result.data.response);
+    setSources(result.data.sources || []);
+
+    setChatHistory((previousHistory) => [
+      ...previousHistory,
+      {
+        id: `user-${Date.now()}`,
+        role: "user",
+        message: userMessage,
+        conversation_id:
+          result.data.conversation_id,
+      },
+      {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        message: result.data.response,
+        conversation_id:
+          result.data.conversation_id,
+      },
+    ]);
+
+    setSelectedConversation({
+      id: result.data.conversation_id,
+    });
+
+    await loadConversations();
+
+    setMessage("");
+  } catch (error) {
+    setResponse(
+      error.response?.data?.detail ||
+        "Unable to get a response from the AI assistant."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const handleConversationClick = async (
+    conversation
+  ) => {
     try {
-      setLoading(true);
-      setResponse("");
-      setSources([]);
+      setConversationLoading(true);
 
       const token = localStorage.getItem("token");
 
       if (!token) {
-        setResponse("Please login to use the AI assistant.");
         return;
       }
 
-      const result = await api.post(
-        "/api/assistant",
-        {
-          message: userMessage,
-        },
+      const result = await api.get(
+        `/api/conversations/${conversation.id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -130,29 +217,22 @@ function Assistant() {
         }
       );
 
-      setResponse(result.data.response);
-      setSources(result.data.sources || []);
+      setSelectedConversation(result.data);
 
-      setChatHistory((previousHistory) => [
-        ...previousHistory,
-        {
-          role: "user",
-          message: userMessage,
-        },
-        {
-          role: "assistant",
-          message: result.data.response,
-        },
-      ]);
+      setChatHistory(
+        result.data.messages || []
+      );
 
+      setResponse("");
+      setSources([]);
       setMessage("");
     } catch (error) {
-      setResponse(
-        error.response?.data?.detail ||
-          "Unable to get a response from the AI assistant."
+      console.error(
+        "Unable to load conversation:",
+        error
       );
     } finally {
-      setLoading(false);
+      setConversationLoading(false);
     }
   };
 
@@ -187,6 +267,7 @@ function Assistant() {
                 className="response-bullet"
               >
                 <span>•</span>
+
                 <p>
                   {trimmedLine.substring(2)}
                 </p>
@@ -207,7 +288,60 @@ function Assistant() {
     );
   };
 
-  const hasHistory = chatHistory.length > 0;
+  const getConversationGroup = (
+    dateString
+  ) => {
+    const date = new Date(dateString);
+    const today = new Date();
+
+    const yesterday = new Date();
+    yesterday.setDate(
+      yesterday.getDate() - 1
+    );
+
+    const isSameDay = (
+      first,
+      second
+    ) => {
+      return (
+        first.getFullYear() ===
+          second.getFullYear() &&
+        first.getMonth() ===
+          second.getMonth() &&
+        first.getDate() ===
+          second.getDate()
+      );
+    };
+
+    if (isSameDay(date, today)) {
+      return "Today";
+    }
+
+    if (isSameDay(date, yesterday)) {
+      return "Yesterday";
+    }
+
+    return "Previous";
+  };
+
+  const groupedConversations = {
+    Today: [],
+    Yesterday: [],
+    Previous: [],
+  };
+
+  conversations.forEach(
+    (conversation) => {
+      const group =
+        getConversationGroup(
+          conversation.updated_at
+        );
+
+      groupedConversations[
+        group
+      ].push(conversation);
+    }
+  );
 
   return (
     <main className="dashboard-page">
@@ -223,17 +357,21 @@ function Assistant() {
               MEDICONNECT AI
             </p>
 
-            <h1>AI Health Assistant</h1>
+            <h1>
+              AI Health Assistant
+            </h1>
 
             <p>
-              Your intelligent healthcare assistant for
-              medical knowledge, documents, doctors,
-              and appointments.
+              Your intelligent healthcare
+              assistant for medical knowledge,
+              documents, doctors, and
+              appointments.
             </p>
           </div>
         </section>
 
         <section className="assistant-upload-card">
+
           <div className="assistant-section-header">
             <div>
               <span className="assistant-section-icon">
@@ -241,11 +379,16 @@ function Assistant() {
               </span>
 
               <div>
-                <h2>Upload Healthcare Document</h2>
+                <h2>
+                  Upload Healthcare
+                  Document
+                </h2>
 
                 <p>
-                  Upload a PDF to add its information
-                  to the MediConnect AI knowledge base.
+                  Upload a PDF to add its
+                  information to the
+                  MediConnect AI knowledge
+                  base.
                 </p>
               </div>
             </div>
@@ -262,7 +405,8 @@ function Assistant() {
                 accept=".pdf,application/pdf"
                 onChange={(event) =>
                   setSelectedFile(
-                    event.target.files[0] || null
+                    event.target.files[0] ||
+                      null
                   )
                 }
               />
@@ -284,236 +428,423 @@ function Assistant() {
               ✓ {uploadMessage}
             </div>
           )}
+
         </section>
 
         <section className="assistant-chat-card">
 
           <div className="assistant-chat-header">
+
             <div className="assistant-avatar">
               ✚
             </div>
 
             <div>
-              <h2>MediConnect AI</h2>
+              <h2>
+                MediConnect AI
+              </h2>
 
               <p>
-                Healthcare knowledge assistant
+                Healthcare knowledge
+                assistant
               </p>
             </div>
 
             <span className="assistant-status">
               ● Online
             </span>
+
           </div>
 
-          {historyLoading && (
-            <div className="assistant-welcome">
-              <div className="assistant-welcome-icon">
-                ⏳
+          <div className="assistant-layout">
+
+            <aside className="chat-history-sidebar">
+
+              <div className="chat-history-header">
+                <h3>
+                  CHAT HISTORY
+                </h3>
               </div>
 
-              <h2>
-                Loading your conversation...
-              </h2>
+              {historyLoading ? (
+                <p className="chat-history-empty">
+                  Loading...
+                </p>
+              ) : conversations.length ===
+                0 ? (
+                <p className="chat-history-empty">
+                  No conversations yet.
+                </p>
+              ) : (
+                Object.entries(
+                  groupedConversations
+                ).map(
+                  ([
+                    group,
+                    groupConversations,
+                  ]) =>
+                    groupConversations.length >
+                      0 && (
+                      <div
+                        className="chat-history-group"
+                        key={group}
+                      >
 
-              <p>
-                Retrieving your previous chat history.
-              </p>
-            </div>
-          )}
+                        <h4>
+                          {group}
+                        </h4>
 
-          {!historyLoading && !hasHistory && !response && !loading && (
-            <div className="assistant-welcome">
-              <div className="assistant-welcome-icon">
-                ✨
-              </div>
+                        {groupConversations.map(
+                          (
+                            conversation
+                          ) => (
+                            <button
+                              type="button"
+                              className={`chat-history-item ${
+                                selectedConversation?.id ===
+                                conversation.id
+                                  ? "active"
+                                  : ""
+                              }`}
+                              key={
+                                conversation.id
+                              }
+                              onClick={() =>
+                                handleConversationClick(
+                                  conversation
+                                )
+                              }
+                              disabled={
+                                conversationLoading
+                              }
+                            >
+                              {
+                                conversation.title
+                              }
+                            </button>
+                          )
+                        )}
 
-              <h2>
-                How can I help you?
-              </h2>
-
-              <p>
-                Ask me about healthcare information,
-                your uploaded documents, doctors, or
-                appointments.
-              </p>
-
-              <div className="assistant-example-grid">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMessage(
-                      "What are the common symptoms of diabetes?"
-                    )
-                  }
-                >
-                  What are the common symptoms of diabetes?
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMessage(
-                      "Find general medicine doctors"
-                    )
-                  }
-                >
-                  Find general medicine doctors
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMessage(
-                      "Show my appointments"
-                    )
-                  }
-                >
-                  Show my appointments
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMessage(
-                      "What does my uploaded document say about diabetes?"
-                    )
-                  }
-                >
-                  Ask about my uploaded document
-                </button>
-              </div>
-            </div>
-          )}
-
-          {!historyLoading && hasHistory && (
-            <div className="assistant-conversation">
-              {chatHistory.map((chat, index) => {
-                if (chat.role === "user") {
-                  return (
-                    <div
-                      className="user-message"
-                      key={chat.id || `user-${index}`}
-                    >
-                      <div className="user-message-avatar">
-                        You
                       </div>
+                    )
+                )
+              )}
 
-                      <div className="user-message-content">
-                        {chat.message}
-                      </div>
-                    </div>
-                  );
-                }
+            </aside>
 
-                return (
-                  <div
-                    className="ai-message"
-                    key={chat.id || `assistant-${index}`}
-                  >
-                    <div className="ai-message-avatar">
-                      ✚
-                    </div>
+            <div className="assistant-chat-main">
 
-                    <div className="ai-message-content">
-                      <div className="ai-message-label">
-                        MediConnect AI
-                      </div>
+              {historyLoading && (
+                <div className="assistant-welcome">
 
-                      {renderMessage(chat.message)}
-                    </div>
+                  <div className="assistant-welcome-icon">
+                    ⏳
                   </div>
-                );
-              })}
-            </div>
-          )}
 
-          {loading && (
-            <div className="ai-message">
-              <div className="ai-message-avatar">
-                ✚
-              </div>
+                  <h2>
+                    Loading your
+                    conversations...
+                  </h2>
 
-              <div className="ai-message-content">
-                <div className="ai-message-label">
-                  MediConnect AI
+                  <p>
+                    Retrieving your chat
+                    history.
+                  </p>
+
                 </div>
+              )}
 
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <p>Thinking...</p>
+              {!historyLoading &&
+                conversationLoading && (
+                  <div className="assistant-welcome">
+
+                    <div className="assistant-welcome-icon">
+                      ⏳
+                    </div>
+
+                    <h2>
+                      Loading conversation...
+                    </h2>
+
+                    <p>
+                      Retrieving this
+                      conversation.
+                    </p>
+
+                  </div>
+                )}
+
+              {!historyLoading &&
+                !conversationLoading &&
+                !selectedConversation &&
+                chatHistory.length === 0 &&
+                !loading && (
+                  <div className="assistant-welcome">
+
+                    <div className="assistant-welcome-icon">
+                      ✨
+                    </div>
+
+                    <h2>
+                      How can I help you?
+                    </h2>
+
+                    <p>
+                      Select a conversation
+                      from the left or start
+                      a new conversation.
+                    </p>
+
+                    <div className="assistant-example-grid">
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMessage(
+                            "What are the common symptoms of diabetes?"
+                          )
+                        }
+                      >
+                        What are the common
+                        symptoms of diabetes?
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMessage(
+                            "Find general medicine doctors"
+                          )
+                        }
+                      >
+                        Find general medicine
+                        doctors
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMessage(
+                            "Show my appointments"
+                          )
+                        }
+                      >
+                        Show my appointments
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMessage(
+                            "What does my uploaded document say about diabetes?"
+                          )
+                        }
+                      >
+                        Ask about my uploaded
+                        document
+                      </button>
+
+                    </div>
+
+                  </div>
+                )}
+
+              {!historyLoading &&
+                !conversationLoading &&
+                chatHistory.length > 0 && (
+                  <div className="assistant-conversation">
+
+                    {chatHistory.map(
+                      (chat, index) => {
+
+                        if (
+                          chat.role ===
+                          "user"
+                        ) {
+                          return (
+                            <div
+                              className="user-message"
+                              key={
+                                chat.id ||
+                                `user-${index}`
+                              }
+                            >
+
+                              <div className="user-message-avatar">
+                                You
+                              </div>
+
+                              <div className="user-message-content">
+                                {
+                                  chat.message
+                                }
+                              </div>
+
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div
+                            className="ai-message"
+                            key={
+                              chat.id ||
+                              `assistant-${index}`
+                            }
+                          >
+
+                            <div className="ai-message-avatar">
+                              ✚
+                            </div>
+
+                            <div className="ai-message-content">
+
+                              <div className="ai-message-label">
+                                MediConnect AI
+                              </div>
+
+                              {renderMessage(
+                                chat.message
+                              )}
+
+                            </div>
+
+                          </div>
+                        );
+                      }
+                    )}
+
+                  </div>
+                )}
+
+              {loading && (
+                <div className="ai-message">
+
+                  <div className="ai-message-avatar">
+                    ✚
+                  </div>
+
+                  <div className="ai-message-content">
+
+                    <div className="ai-message-label">
+                      MediConnect AI
+                    </div>
+
+                    <div className="typing-indicator">
+
+                      <span></span>
+                      <span></span>
+                      <span></span>
+
+                      <p>
+                        Thinking...
+                      </p>
+
+                    </div>
+
+                  </div>
+
                 </div>
-              </div>
+              )}
+
+              <form
+                className="assistant-chat-input"
+                onSubmit={handleAsk}
+              >
+
+                <textarea
+                  value={message}
+                  onChange={(event) =>
+                    setMessage(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Ask MediConnect AI anything..."
+                  rows="2"
+                  required
+                />
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading
+                    ? "..."
+                    : "➤"}
+                </button>
+
+              </form>
+
+              <p className="assistant-disclaimer">
+                MediConnect AI provides
+                general healthcare
+                information and does not
+                replace professional
+                medical advice.
+              </p>
+
             </div>
-          )}
 
-          <form
-            className="assistant-chat-input"
-            onSubmit={handleAsk}
-          >
-            <textarea
-              value={message}
-              onChange={(event) =>
-                setMessage(event.target.value)
-              }
-              placeholder="Ask MediConnect AI anything..."
-              rows="2"
-              required
-            />
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? "..." : "➤"}
-            </button>
-          </form>
-
-          <p className="assistant-disclaimer">
-            MediConnect AI provides general healthcare
-            information and does not replace professional
-            medical advice.
-          </p>
         </section>
 
         {sources.length > 0 && (
           <section className="assistant-sources-card">
+
             <div className="assistant-sources-header">
-              <span>📚</span>
+
+              <span>
+                📚
+              </span>
 
               <div>
-                <h2>Knowledge Sources</h2>
+
+                <h2>
+                  Knowledge Sources
+                </h2>
 
                 <p>
-                  Information used to generate this answer
+                  Information used to
+                  generate this answer
                 </p>
+
               </div>
+
             </div>
 
             <div className="assistant-source-list">
-              {sources.map((source, index) => (
-                <div
-                  className="assistant-source-item"
-                  key={`${source.source}-${source.page}-${index}`}
-                >
-                  <div className="source-file-icon">
-                    📄
-                  </div>
 
-                  <div>
-                    <strong>
-                      {source.source}
-                    </strong>
+              {sources.map(
+                (source, index) => (
+                  <div
+                    className="assistant-source-item"
+                    key={`${source.source}-${source.page}-${index}`}
+                  >
 
-                    <p>
-                      Page {source.page + 1}
-                    </p>
+                    <div className="source-file-icon">
+                      📄
+                    </div>
+
+                    <div>
+
+                      <strong>
+                        {source.source}
+                      </strong>
+
+                      <p>
+                        Page{" "}
+                        {source.page + 1}
+                      </p>
+
+                    </div>
+
                   </div>
-                </div>
-              ))}
+                )
+              )}
+
             </div>
+
           </section>
         )}
 

@@ -79,3 +79,4 @@ for user_directory in documents_path.glob("user_*"):
                 f"{pdf_file.name}"
             )
             print(f"Error: {error}")
+            
