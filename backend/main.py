@@ -1084,6 +1084,21 @@ async def upload_pdf(
         )
 
 
+@app.get("/api/documents")
+def get_my_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    documents = (
+        db.query(UserDocument)
+        .filter(UserDocument.user_id == current_user.id)
+        .order_by(UserDocument.uploaded_at.desc())
+        .all()
+    )
+
+    return documents
+
+
 @app.get("/api/chat-history")
 def get_chat_history(
     db: Session = Depends(get_db),
