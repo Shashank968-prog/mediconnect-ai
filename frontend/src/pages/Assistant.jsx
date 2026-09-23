@@ -245,6 +245,40 @@ const handleNewChat = () => {
     }
   };
 
+  const handleDeleteConversation = async (conversationId) => {
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      return;
+    }
+
+    await api.delete(
+      `/api/conversations/${conversationId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (selectedConversation?.id === conversationId) {
+      setSelectedConversation(null);
+      setChatHistory([]);
+      setResponse("");
+      setSources([]);
+      setMessage("");
+    }
+
+    await loadConversations();
+  } catch (error) {
+    console.error(
+      "Unable to delete conversation:",
+      error
+    );
+  }
+};
+
   const renderMessage = (text) => {
     if (!text) {
       return null;
@@ -514,30 +548,38 @@ const handleNewChat = () => {
                           (
                             conversation
                           ) => (
-                            <button
-                              type="button"
-                              className={`chat-history-item ${
-                                selectedConversation?.id ===
-                                conversation.id
-                                  ? "active"
-                                  : ""
-                              }`}
-                              key={
-                                conversation.id
-                              }
-                              onClick={() =>
-                                handleConversationClick(
-                                  conversation
-                                )
-                              }
-                              disabled={
-                                conversationLoading
-                              }
-                            >
-                              {
-                                conversation.title
-                              }
-                            </button>
+                            <div
+  className={`chat-history-item-wrapper ${
+    selectedConversation?.id === conversation.id
+      ? "active"
+      : ""
+  }`}
+  key={conversation.id}
+>
+  <button
+    type="button"
+    className="chat-history-item"
+    onClick={() =>
+      handleConversationClick(conversation)
+    }
+    disabled={conversationLoading}
+  >
+    {conversation.title}
+  </button>
+
+  <button
+    type="button"
+    className="delete-conversation-button"
+    onClick={(event) => {
+      event.stopPropagation();
+      handleDeleteConversation(conversation.id);
+    }}
+    disabled={conversationLoading}
+    title="Delete conversation"
+  >
+    🗑
+  </button>
+</div>
                           )
                         )}
 

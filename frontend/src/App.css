@@ -1386,3 +1386,42 @@
   background: #eff6ff;
   border-color: #93c5fd;
 }
+
+.chat-history-item-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.chat-history-item-wrapper .chat-history-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.delete-conversation-button {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.delete-conversation-button:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  transform: scale(1.05);
+}
+
+.delete-conversation-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -1162,3 +1162,36 @@ def get_conversation(
         "updated_at": conversation.updated_at,
         "messages": messages
     }
+
+@app.delete("/api/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    conversation = (
+        db.query(Conversation)
+        .filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found."
+        )
+
+    db.query(ChatMessage).filter(
+        ChatMessage.conversation_id == conversation.id,
+        ChatMessage.user_id == current_user.id
+    ).delete(synchronize_session=False)
+
+    db.delete(conversation)
+    db.commit()
+
+    return {
+        "message": "Conversation deleted successfully."
+    }
