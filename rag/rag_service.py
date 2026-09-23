@@ -20,7 +20,11 @@ client = genai.Client(
 DOCUMENTS_PATH = Path("rag/documents")
 
 
-def ingest_pdf(file_path: str):
+def ingest_pdf(
+    file_path: str,
+    user_id: int | None = None,
+    document_type: str = "private"
+):
     loader = PyPDFLoader(file_path)
 
     documents = loader.load()
@@ -32,6 +36,12 @@ def ingest_pdf(file_path: str):
 
     chunks = text_splitter.split_documents(documents)
 
+    for chunk in chunks:
+        chunk.metadata["document_type"] = document_type
+
+        if document_type == "private":
+            chunk.metadata["user_id"] = user_id
+
     vector_store.add_documents(
         documents=chunks
     )
@@ -39,22 +49,42 @@ def ingest_pdf(file_path: str):
     return len(chunks)
 
 
-def search_knowledge(query: str, k: int = 4):
+def search_knowledge(
+    query: str,
+    user_id: int,
+    k: int = 6
+):
     results = vector_store.similarity_search_with_score(
         query,
-        k=k
+        k=k,
+        filter={
+            "$or": [
+                {
+                    "document_type": "global"
+                },
+                {
+                    "user_id": user_id
+                }
+            ]
+        }
     )
 
     return results
 
 
-def ask_rag(query: str):
-    results = search_knowledge(query)
+def ask_rag(
+    query: str,
+    user_id: int
+):
+    results = search_knowledge(
+        query,
+        user_id
+    )
 
     relevant_results = [
         (document, score)
         for document, score in results
-        if score < 0.70
+        if score < 1.20
     ]
 
     if not relevant_results:
@@ -75,6 +105,12 @@ You are the MediConnect AI healthcare assistant.
 
 Answer the user's question using only the healthcare information
 provided in the context below.
+
+The context may contain:
+- Shared healthcare knowledge available to all users.
+- Private healthcare documents uploaded by the current user.
+
+Never use private information belonging to another user.
 
 If the context does not contain enough information to answer
 the question, clearly say that the available knowledge base
@@ -101,23 +137,24 @@ User question:
         source = document.metadata.get("source")
         page = document.metadata.get("page")
 
-    if source:
-        source = source.replace("\\", "/")
+        if source:
+            source = source.replace("\\", "/")
 
-    source_key = (source, page)
+        source_key = (source, page)
 
-    if source_key not in seen:
-        seen.add(source_key)
+        if source_key not in seen:
+            seen.add(source_key)
 
-        sources.append({
-            "source": source,
-            "page": page
-        })
+            sources.append({
+                "source": source,
+                "page": page
+            })
 
     return {
         "answer": response.text,
         "sources": sources
     }
+
 
 def ask_general_gemini(query: str):
     prompt = f"""
@@ -143,4 +180,3 @@ User question:
         "answer": response.text,
         "sources": []
     }
-

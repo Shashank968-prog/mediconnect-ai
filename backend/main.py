@@ -991,7 +991,8 @@ async def upload_pdf(
 
     try:
         chunk_count = ingest_pdf(
-            str(file_path)
+            str(file_path),
+            current_user.id
         )
 
         document = UserDocument(

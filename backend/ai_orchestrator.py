@@ -328,4 +328,7 @@ def process_ai_request(message: str, current_user):
                 "sources": []
             }
 
-    return ask_rag(message)
+    return ask_rag(
+    message,
+    current_user.id
+)
