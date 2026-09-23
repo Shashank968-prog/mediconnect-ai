@@ -25,6 +25,7 @@ from backend.models import (
     PasswordResetToken,
     User,
     UserDocument,
+    ChatMessage
 )
 
 from backend.schemas import (
@@ -891,7 +892,8 @@ def verify_otp(
 @app.post("/api/assistant")
 def assistant(
     request: AssistantRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     print(
         "Authenticated user:",
@@ -900,10 +902,28 @@ def assistant(
         current_user.role
     )
 
+    user_message = ChatMessage(
+        user_id=current_user.id,
+        role="user",
+        message=request.message
+    )
+
+    db.add(user_message)
+    db.commit()
+
     result = process_ai_request(
         request.message,
         current_user
     )
+
+    assistant_message = ChatMessage(
+        user_id=current_user.id,
+        role="assistant",
+        message=result["answer"]
+    )
+
+    db.add(assistant_message)
+    db.commit()
 
     return {
         "response": result["answer"],
@@ -1021,3 +1041,21 @@ async def upload_pdf(
             status_code=500,
             detail=f"Unable to process PDF: {str(error)}"
         )
+
+@app.get("/api/chat-history")
+def get_chat_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    messages = (
+        db.query(ChatMessage)
+        .filter(
+            ChatMessage.user_id == current_user.id
+        )
+        .order_by(
+            ChatMessage.created_at.asc()
+        )
+        .all()
+    )
+
+    return messages

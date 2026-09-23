@@ -9,6 +9,16 @@ from sqlalchemy import (
     Integer,
     String,
 )
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text
+)
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
@@ -58,6 +68,11 @@ class User(Base):
         "UserDocument",
         back_populates="user"
     )
+
+    chat_messages = relationship(
+    "ChatMessage",
+    back_populates="user"
+)
 
 
 class DoctorProfile(Base):
@@ -290,4 +305,22 @@ class UserDocument(Base):
     user = relationship(
         "User",
         back_populates="documents"
+    )
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    role = Column(String(20), nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    user = relationship(
+        "User",
+        back_populates="chat_messages"
     )

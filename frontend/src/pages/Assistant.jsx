@@ -1,16 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../services/api";
 
 function Assistant() {
   const [message, setMessage] = useState("");
   const [response, setResponse] = useState("");
   const [sources, setSources] = useState([]);
+  const [chatHistory, setChatHistory] = useState([]);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
   const [uploading, setUploading] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      try {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          setHistoryLoading(false);
+          return;
+        }
+
+        const result = await api.get(
+          "/api/chat-history",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        setChatHistory(result.data || []);
+      } catch (error) {
+        console.error("Unable to load chat history:", error);
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+
+    loadChatHistory();
+  }, []);
 
   const handleUpload = async (event) => {
     event.preventDefault();
@@ -72,6 +104,8 @@ function Assistant() {
       return;
     }
 
+    const userMessage = message.trim();
+
     try {
       setLoading(true);
       setResponse("");
@@ -87,7 +121,7 @@ function Assistant() {
       const result = await api.post(
         "/api/assistant",
         {
-          message: message.trim(),
+          message: userMessage,
         },
         {
           headers: {
@@ -98,6 +132,20 @@ function Assistant() {
 
       setResponse(result.data.response);
       setSources(result.data.sources || []);
+
+      setChatHistory((previousHistory) => [
+        ...previousHistory,
+        {
+          role: "user",
+          message: userMessage,
+        },
+        {
+          role: "assistant",
+          message: result.data.response,
+        },
+      ]);
+
+      setMessage("");
     } catch (error) {
       setResponse(
         error.response?.data?.detail ||
@@ -108,12 +156,12 @@ function Assistant() {
     }
   };
 
-  const renderResponse = () => {
-    if (!response) {
+  const renderMessage = (text) => {
+    if (!text) {
       return null;
     }
 
-    const lines = response.split("\n");
+    const lines = text.split("\n");
 
     return (
       <div className="ai-response-content">
@@ -121,7 +169,12 @@ function Assistant() {
           const trimmedLine = line.trim();
 
           if (!trimmedLine) {
-            return <div key={index} className="response-space" />;
+            return (
+              <div
+                key={index}
+                className="response-space"
+              />
+            );
           }
 
           if (
@@ -153,6 +206,8 @@ function Assistant() {
       </div>
     );
   };
+
+  const hasHistory = chatHistory.length > 0;
 
   return (
     <main className="dashboard-page">
@@ -240,6 +295,7 @@ function Assistant() {
 
             <div>
               <h2>MediConnect AI</h2>
+
               <p>
                 Healthcare knowledge assistant
               </p>
@@ -250,7 +306,23 @@ function Assistant() {
             </span>
           </div>
 
-          {!response && !loading && (
+          {historyLoading && (
+            <div className="assistant-welcome">
+              <div className="assistant-welcome-icon">
+                ⏳
+              </div>
+
+              <h2>
+                Loading your conversation...
+              </h2>
+
+              <p>
+                Retrieving your previous chat history.
+              </p>
+            </div>
+          )}
+
+          {!historyLoading && !hasHistory && !response && !loading && (
             <div className="assistant-welcome">
               <div className="assistant-welcome-icon">
                 ✨
@@ -314,31 +386,45 @@ function Assistant() {
             </div>
           )}
 
-          {response && (
+          {!historyLoading && hasHistory && (
             <div className="assistant-conversation">
-              <div className="user-message">
-                <div className="user-message-avatar">
-                  You
-                </div>
+              {chatHistory.map((chat, index) => {
+                if (chat.role === "user") {
+                  return (
+                    <div
+                      className="user-message"
+                      key={chat.id || `user-${index}`}
+                    >
+                      <div className="user-message-avatar">
+                        You
+                      </div>
 
-                <div className="user-message-content">
-                  {message}
-                </div>
-              </div>
+                      <div className="user-message-content">
+                        {chat.message}
+                      </div>
+                    </div>
+                  );
+                }
 
-              <div className="ai-message">
-                <div className="ai-message-avatar">
-                  ✚
-                </div>
+                return (
+                  <div
+                    className="ai-message"
+                    key={chat.id || `assistant-${index}`}
+                  >
+                    <div className="ai-message-avatar">
+                      ✚
+                    </div>
 
-                <div className="ai-message-content">
-                  <div className="ai-message-label">
-                    MediConnect AI
+                    <div className="ai-message-content">
+                      <div className="ai-message-label">
+                        MediConnect AI
+                      </div>
+
+                      {renderMessage(chat.message)}
+                    </div>
                   </div>
-
-                  {renderResponse()}
-                </div>
-              </div>
+                );
+              })}
             </div>
           )}
 
@@ -399,6 +485,7 @@ function Assistant() {
 
               <div>
                 <h2>Knowledge Sources</h2>
+
                 <p>
                   Information used to generate this answer
                 </p>
