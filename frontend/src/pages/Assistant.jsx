@@ -196,6 +196,15 @@ function Assistant() {
   }
 };
 
+const handleNewChat = () => {
+  setSelectedConversation(null);
+  setChatHistory([]);
+  setResponse("");
+  setSources([]);
+  setMessage("");
+};
+
+
   const handleConversationClick = async (
     conversation
   ) => {
@@ -461,11 +470,18 @@ function Assistant() {
             <aside className="chat-history-sidebar">
 
               <div className="chat-history-header">
-                <h3>
-                  CHAT HISTORY
-                </h3>
-              </div>
+  <h3>
+    CHAT HISTORY
+  </h3>
 
+  <button
+    type="button"
+    className="new-chat-button"
+    onClick={handleNewChat}
+  >
+    + New Chat
+  </button>
+</div>
               {historyLoading ? (
                 <p className="chat-history-empty">
                   Loading...
