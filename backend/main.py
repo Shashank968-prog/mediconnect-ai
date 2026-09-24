@@ -45,6 +45,7 @@ from backend.schemas import (
     PasswordChangeRequest,
     AssistantRequest,
     DoctorVerificationRequest,
+      DocumentQuestionRequest
 )
 
 from backend.security import hash_password, verify_password
@@ -59,7 +60,8 @@ from rag.rag_service import ask_rag, ingest_pdf
 
 from rag.rag_service import (
     ask_rag,
-    delete_document_from_vector_store
+    delete_document_from_vector_store,
+    ask_document_rag
 )
 
 import re
@@ -1186,6 +1188,54 @@ def delete_my_document(
     return {
         "message": "Document deleted successfully."
     }
+
+@app.post("/api/documents/{document_id}/ask")
+def ask_about_document(
+    document_id: int,
+    request: DocumentQuestionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "patient":
+        raise HTTPException(
+            status_code=403,
+            detail="Only patients can ask questions about personal documents."
+        )
+
+    if not request.question.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty."
+        )
+
+    document = (
+        db.query(UserDocument)
+        .filter(
+            UserDocument.id == document_id,
+            UserDocument.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found."
+        )
+
+    result = ask_document_rag(
+        query=request.question,
+        user_id=current_user.id,
+        file_path=document.file_path
+    )
+
+    return {
+        "document_id": document.id,
+        "filename": document.filename,
+        "response": result["answer"],
+        "sources": result["sources"]
+    }
+
 
 
 @app.get("/api/chat-history")

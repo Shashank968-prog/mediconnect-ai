@@ -129,3 +129,6 @@ class AssistantRequest(BaseModel):
 
 class DoctorVerificationRequest(BaseModel):
     verification_status: str
+
+class DocumentQuestionRequest(BaseModel):
+    question: str

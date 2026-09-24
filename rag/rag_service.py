@@ -156,6 +156,107 @@ User question:
         "sources": sources
     }
 
+def ask_document_rag(
+    query: str,
+    user_id: int,
+    file_path: str,
+    k: int = 6
+):
+    results = vector_store.similarity_search_with_score(
+        query,
+        k=k,
+        filter={
+            "$and": [
+                {
+                    "document_type": "private"
+                },
+                {
+                    "user_id": user_id
+                },
+                {
+                    "source": file_path
+                }
+            ]
+        }
+    )
+
+    relevant_results = [
+        (document, score)
+        for document, score in results
+        if score < 1.20
+    ]
+
+    if not relevant_results:
+        return {
+            "answer": (
+                "The selected document does not contain "
+                "enough information to answer this question."
+            ),
+            "sources": []
+        }
+
+    documents = [
+        document
+        for document, score in relevant_results
+    ]
+
+    context = "\n\n".join(
+        document.page_content
+        for document in documents
+    )
+
+    prompt = f"""
+You are the MediConnect AI healthcare assistant.
+
+Answer the user's question using only the information
+contained in the selected healthcare document.
+
+Do not use information from any other document.
+
+If the selected document does not contain enough
+information to answer the question, clearly say so.
+
+Do not invent medical facts.
+
+Selected document:
+{file_path}
+
+Healthcare document context:
+{context}
+
+User question:
+{query}
+"""
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
+
+    sources = []
+    seen = set()
+
+    for document in documents:
+        source = document.metadata.get("source")
+        page = document.metadata.get("page")
+
+        if source:
+            source = source.replace("\\", "/")
+
+        source_key = (source, page)
+
+        if source_key not in seen:
+            seen.add(source_key)
+
+            sources.append({
+                "source": source,
+                "page": page
+            })
+
+    return {
+        "answer": response.text,
+        "sources": sources
+    }
 
 def ask_general_gemini(query: str):
     prompt = f"""

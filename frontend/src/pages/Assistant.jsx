@@ -17,6 +17,8 @@ function Assistant() {
   const [documents, setDocuments] = useState([]);
   const [deletingDocumentId, setDeletingDocumentId] =
     useState(null);
+  const [selectedDocument, setSelectedDocument] =
+    useState(null);
 
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -259,6 +261,40 @@ function Assistant() {
         return;
       }
 
+      if (selectedDocument) {
+        const result = await api.post(
+          `/api/documents/${selectedDocument.id}/ask`,
+          {
+            question: userMessage,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        setResponse(result.data.response);
+        setSources(result.data.sources || []);
+
+        setChatHistory((previousHistory) => [
+          ...previousHistory,
+          {
+            id: `user-${Date.now()}`,
+            role: "user",
+            message: userMessage,
+          },
+          {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            message: result.data.response,
+          },
+        ]);
+
+        setMessage("");
+        return;
+      }
+
       const result = await api.post(
         "/api/assistant",
         {
@@ -313,6 +349,16 @@ function Assistant() {
 
   const handleNewChat = () => {
     setSelectedConversation(null);
+    setSelectedDocument(null);
+    setChatHistory([]);
+    setResponse("");
+    setSources([]);
+    setMessage("");
+  };
+
+  const handleAskAboutDocument = (document) => {
+    setSelectedDocument(document);
+    setSelectedConversation(null);
     setChatHistory([]);
     setResponse("");
     setSources([]);
@@ -341,6 +387,7 @@ function Assistant() {
       );
 
       setSelectedConversation(result.data);
+      setSelectedDocument(null);
 
       setChatHistory(
         result.data.messages || []
@@ -684,6 +731,19 @@ function Assistant() {
 
                     <button
                       type="button"
+                      className="ask-document-button"
+                      onClick={() =>
+                        handleAskAboutDocument(
+                          document
+                        )
+                      }
+                      title="Ask about this document"
+                    >
+                      💬
+                    </button>
+
+                    <button
+                      type="button"
                       className="view-document-button"
                       onClick={() =>
                         handleViewDocument(
@@ -857,6 +917,34 @@ function Assistant() {
             </aside>
 
             <div className="assistant-chat-main">
+
+              {selectedDocument && (
+                <div className="selected-document-banner">
+                  <div>
+                    <span>
+                      📄
+                    </span>
+                    <div>
+                      <strong>
+                        Asking about:
+                      </strong>
+                      <span>
+                        {selectedDocument.filename}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedDocument(null)
+                    }
+                    title="Exit document chat"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
 
               {historyLoading && (
                 <div className="assistant-welcome">
@@ -1083,7 +1171,11 @@ function Assistant() {
                       event.target.value
                     )
                   }
-                  placeholder="Ask MediConnect AI anything..."
+                  placeholder={
+                    selectedDocument
+                      ? `Ask about ${selectedDocument.filename}...`
+                      : "Ask MediConnect AI anything..."
+                  }
                   rows="2"
                   required
                 />
