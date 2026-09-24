@@ -64,8 +64,21 @@ from rag.rag_service import (
 
 import re
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
-
+from fastapi import (
+    FastAPI,
+    Depends,
+    HTTPException,
+    UploadFile,
+    File
+)
+from fastapi import (
+    FastAPI,
+    Depends,
+    HTTPException,
+    UploadFile,
+    File
+)
+from fastapi.responses import FileResponse
 from pathlib import Path
 from datetime import datetime
 
@@ -1102,6 +1115,40 @@ def get_my_documents(
     )
 
     return documents
+
+@app.get("/api/documents/{document_id}/view")
+def view_my_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    document = (
+        db.query(UserDocument)
+        .filter(
+            UserDocument.id == document_id,
+            UserDocument.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found."
+        )
+
+    if not os.path.exists(document.file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Document file not found."
+        )
+
+    return FileResponse(
+        path=document.file_path,
+        media_type="application/pdf",
+        filename=document.filename
+    )
+
 
 @app.delete("/api/documents/{document_id}")
 def delete_my_document(

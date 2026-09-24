@@ -154,6 +154,43 @@ function Assistant() {
     }
   };
 
+  const handleViewDocument = async (
+    documentId
+  ) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        return;
+      }
+
+      const response = await api.get(
+        `/api/documents/${documentId}/view`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          responseType: "blob",
+        }
+      );
+
+      const pdfUrl = window.URL.createObjectURL(
+        response.data
+      );
+
+      window.open(pdfUrl, "_blank");
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(pdfUrl);
+      }, 60000);
+    } catch (error) {
+      setUploadMessage(
+        error.response?.data?.detail ||
+          "Unable to open the document."
+      );
+    }
+  };
+
   const handleDeleteDocument = async (
     documentId,
     filename
@@ -643,26 +680,43 @@ function Assistant() {
 
                   </div>
 
-                  <button
-                    type="button"
-                    className="delete-document-button"
-                    onClick={() =>
-                      handleDeleteDocument(
-                        document.id,
-                        document.filename
-                      )
-                    }
-                    disabled={
-                      deletingDocumentId ===
+                  <div className="document-actions">
+
+                    <button
+                      type="button"
+                      className="view-document-button"
+                      onClick={() =>
+                        handleViewDocument(
+                          document.id
+                        )
+                      }
+                      title="View document"
+                    >
+                      👁
+                    </button>
+
+                    <button
+                      type="button"
+                      className="delete-document-button"
+                      onClick={() =>
+                        handleDeleteDocument(
+                          document.id,
+                          document.filename
+                        )
+                      }
+                      disabled={
+                        deletingDocumentId ===
+                        document.id
+                      }
+                      title="Delete document"
+                    >
+                      {deletingDocumentId ===
                       document.id
-                    }
-                    title="Delete document"
-                  >
-                    {deletingDocumentId ===
-                    document.id
-                      ? "..."
-                      : "🗑"}
-                  </button>
+                        ? "..."
+                        : "🗑"}
+                    </button>
+
+                  </div>
 
                 </div>
               ))}

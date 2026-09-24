@@ -1558,3 +1558,31 @@
     font-size: 11px;
   }
 }
+
+.document-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.view-document-button {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.view-document-button:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+  transform: scale(1.05);
+}
