@@ -57,6 +57,11 @@ from backend.ai_orchestrator import process_ai_request
 
 from rag.rag_service import ask_rag, ingest_pdf
 
+from rag.rag_service import (
+    ask_rag,
+    delete_document_from_vector_store
+)
+
 import re
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
@@ -1097,6 +1102,43 @@ def get_my_documents(
     )
 
     return documents
+
+@app.delete("/api/documents/{document_id}")
+def delete_my_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    document = (
+        db.query(UserDocument)
+        .filter(
+            UserDocument.id == document_id,
+            UserDocument.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found."
+        )
+
+    file_path = document.file_path
+
+    delete_document_from_vector_store(
+        file_path
+    )
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    db.delete(document)
+    db.commit()
+
+    return {
+        "message": "Document deleted successfully."
+    }
 
 
 @app.get("/api/chat-history")

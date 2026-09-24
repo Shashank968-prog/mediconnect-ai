@@ -10,6 +10,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from rag.vector_store import vector_store
 
 
+
 load_dotenv("backend/.env")
 
 client = genai.Client(
@@ -180,3 +181,12 @@ User question:
         "answer": response.text,
         "sources": []
     }
+
+def delete_document_from_vector_store(file_path: str):
+    source_path = file_path.replace("\\", "/")
+
+    vector_store._collection.delete(
+        where={
+            "source": source_path
+        }
+    )

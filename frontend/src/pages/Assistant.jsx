@@ -15,6 +15,8 @@ function Assistant() {
   const [uploadMessage, setUploadMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [documents, setDocuments] = useState([]);
+  const [deletingDocumentId, setDeletingDocumentId] =
+    useState(null);
 
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -149,6 +151,51 @@ function Assistant() {
       );
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDeleteDocument = async (
+    documentId,
+    filename
+  ) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${filename}"?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingDocumentId(documentId);
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        return;
+      }
+
+      await api.delete(
+        `/api/documents/${documentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      await loadDocuments();
+
+      setUploadMessage(
+        `${filename} deleted successfully.`
+      );
+    } catch (error) {
+      setUploadMessage(
+        error.response?.data?.detail ||
+          "Unable to delete the document."
+      );
+    } finally {
+      setDeletingDocumentId(null);
     }
   };
 
@@ -595,6 +642,27 @@ function Assistant() {
                     </div>
 
                   </div>
+
+                  <button
+                    type="button"
+                    className="delete-document-button"
+                    onClick={() =>
+                      handleDeleteDocument(
+                        document.id,
+                        document.filename
+                      )
+                    }
+                    disabled={
+                      deletingDocumentId ===
+                      document.id
+                    }
+                    title="Delete document"
+                  >
+                    {deletingDocumentId ===
+                    document.id
+                      ? "..."
+                      : "🗑"}
+                  </button>
 
                 </div>
               ))}
