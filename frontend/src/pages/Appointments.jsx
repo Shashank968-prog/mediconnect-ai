@@ -74,83 +74,176 @@ function Appointments() {
     }
   };
 
+  const getStatusClass = (status) => {
+    if (status === "confirmed") {
+      return "status-confirmed";
+    }
+
+    if (status === "completed") {
+      return "status-completed";
+    }
+
+    if (status === "cancelled") {
+      return "status-cancelled";
+    }
+
+    return "status-pending";
+  };
+
+  const formatStatus = (status) => {
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatTime = (date) => {
+    return new Date(date).toLocaleTimeString("en-IN", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
   return (
-    <main className="dashboard-page">
-      <section className="dashboard-header">
+    <main className="appointments-page">
+      <section className="appointments-header">
         <div>
           <p className="dashboard-tag">MEDICONNECT AI</p>
+
           <h1>My Appointments</h1>
-          <p>View and manage your healthcare appointments.</p>
+
+          <p>
+            View and manage your healthcare appointments in one place.
+          </p>
         </div>
 
         <button
-          className="logout-button"
-          onClick={() => navigate("/dashboard")}
+          className="book-appointment-button"
+          onClick={() => navigate("/book-appointment")}
         >
-          Back to Dashboard
+          + Book Appointment
         </button>
       </section>
 
-      <section className="dashboard-card">
-        <h2>Appointment History</h2>
+      {message && (
+        <div className="appointment-message">
+          {message}
+        </div>
+      )}
 
-        {loading && <p>Loading appointments...</p>}
+      {loading && (
+        <section className="appointments-state">
+          <div className="loading-icon">⏳</div>
+          <h2>Loading your appointments...</h2>
+          <p>Please wait while we retrieve your appointment history.</p>
+        </section>
+      )}
 
-        {message && <p>{message}</p>}
+      {!loading && appointments.length === 0 && (
+        <section className="appointments-state">
+          <div className="empty-icon">📅</div>
 
-        {!loading && appointments.length === 0 && (
-          <p>You don't have any appointments yet.</p>
-        )}
+          <h2>No appointments yet</h2>
 
-        {!loading && appointments.length > 0 && (
-          <div className="appointments-list">
+          <p>
+            You haven't booked any appointments. Find a doctor and
+            schedule your first appointment.
+          </p>
+
+          <button
+            className="book-appointment-button"
+            onClick={() => navigate("/book-appointment")}
+          >
+            Book Your First Appointment
+          </button>
+        </section>
+      )}
+
+      {!loading && appointments.length > 0 && (
+        <section className="appointments-section">
+          <div className="appointments-section-title">
+            <div>
+              <h2>Appointment History</h2>
+              <p>{appointments.length} appointment(s)</p>
+            </div>
+          </div>
+
+          <div className="appointments-grid">
             {appointments.map((appointment) => (
-              <div
-                className="appointment-item"
+              <article
+                className="appointment-card"
                 key={appointment.id}
               >
-                <h3>Appointment #{appointment.id}</h3>
+                <div className="appointment-card-top">
+                  <div className="doctor-avatar">
+                    👨‍⚕️
+                  </div>
 
-                <p>
-                  <strong>Doctor:</strong>{" "}
-                  {appointment.doctor_name}
-                </p>
+                  <span
+                    className={`appointment-status ${getStatusClass(
+                      appointment.status
+                    )}`}
+                  >
+                    {formatStatus(appointment.status)}
+                  </span>
+                </div>
 
-                <p>
-                  <strong>Specialization:</strong>{" "}
-                  {appointment.specialization}
-                </p>
+                <div className="doctor-info">
+                  <h3>{appointment.doctor_name}</h3>
 
-                <p>
-                  <strong>Qualification:</strong>{" "}
-                  {appointment.qualification}
-                </p>
+                  <p className="specialization">
+                    {appointment.specialization}
+                  </p>
+                </div>
 
-                <p>
-                  <strong>Experience:</strong>{" "}
-                  {appointment.experience_years} years
-                </p>
+                <div className="appointment-date-box">
+                  <div>
+                    <span className="detail-label">DATE</span>
+                    <strong>
+                      📅 {formatDate(appointment.appointment_date)}
+                    </strong>
+                  </div>
 
-                <p>
-                  <strong>Date & Time:</strong>{" "}
-                  {new Date(
-                    appointment.appointment_date
-                  ).toLocaleString()}
-                </p>
+                  <div>
+                    <span className="detail-label">TIME</span>
+                    <strong>
+                      🕐 {formatTime(appointment.appointment_date)}
+                    </strong>
+                  </div>
+                </div>
 
-                <p>
-                  <strong>Reason:</strong>{" "}
-                  {appointment.reason}
-                </p>
+                <div className="appointment-details">
+                  <div className="detail-row">
+                    <span>Qualification</span>
+                    <strong>
+                      {appointment.qualification}
+                    </strong>
+                  </div>
 
-                <p>
-                  <strong>Status:</strong>{" "}
-                  {appointment.status}
-                </p>
+                  <div className="detail-row">
+                    <span>Experience</span>
+                    <strong>
+                      {appointment.experience_years} years
+                    </strong>
+                  </div>
+
+                  <div className="detail-row">
+                    <span>Reason</span>
+                    <strong>
+                      {appointment.reason}
+                    </strong>
+                  </div>
+                </div>
 
                 {appointment.status !== "cancelled" &&
                   appointment.status !== "completed" && (
                     <button
+                      className="cancel-appointment-button"
                       onClick={() =>
                         handleCancel(appointment.id)
                       }
@@ -158,11 +251,11 @@ function Appointments() {
                       Cancel Appointment
                     </button>
                   )}
-              </div>
+              </article>
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
     </main>
   );
 }

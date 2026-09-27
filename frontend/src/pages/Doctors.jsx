@@ -27,8 +27,6 @@ function Doctors() {
         },
       });
 
-      console.log("Doctors API response:", response.data);
-
       if (Array.isArray(response.data)) {
         setDoctors(response.data);
       } else {
@@ -52,9 +50,12 @@ function Doctors() {
   }, []);
 
   const handleBookAppointment = (doctor) => {
+    const doctorUserId = doctor.user?.id;
+
     navigate("/book-appointment", {
       state: {
-        doctorId: doctor.id,
+        doctorUserId: doctorUserId,
+        doctorProfileId: doctor.id,
         doctorName: doctor.user?.name,
         specialization: doctor.specialization,
       },
@@ -202,7 +203,9 @@ function Doctors() {
                       type="button"
                       className="doctor-book-button"
                       onClick={() =>
-                        handleBookAppointment(doctor)
+                        handleBookAppointment(
+                          doctor
+                        )
                       }
                     >
                       Book Appointment

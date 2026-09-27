@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
+
 import Home from "./pages/home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -12,6 +15,7 @@ import BookAppointment from "./pages/BookAppointment";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import Assistant from "./pages/Assistant";
 import AdminDashboard from "./pages/AdminDashboard";
+
 import "./App.css";
 
 function App() {
@@ -20,6 +24,7 @@ function App() {
       <Navbar />
 
       <Routes>
+        {/* Public routes */}
         <Route path="/" element={<Home />} />
 
         <Route path="/login" element={<Login />} />
@@ -31,33 +36,39 @@ function App() {
 
         <Route path="/register" element={<Register />} />
 
-        <Route path="/dashboard" element={<Dashboard />} />
+        {/* Protected routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
 
-        <Route path="/profile" element={<Profile />} />
+          <Route path="/profile" element={<Profile />} />
 
-        <Route path="/appointments" element={<Appointments />} />
+          <Route
+            path="/appointments"
+            element={<Appointments />}
+          />
 
-        <Route path="/doctors" element={<Doctors />} />
+          <Route path="/doctors" element={<Doctors />} />
 
-        <Route
-          path="/book-appointment"
-          element={<BookAppointment />}
-        />
+          <Route
+            path="/book-appointment"
+            element={<BookAppointment />}
+          />
 
-        <Route
-          path="/doctor-dashboard"
-          element={<DoctorDashboard />}
-        />
+          <Route
+            path="/doctor-dashboard"
+            element={<DoctorDashboard />}
+          />
 
-        <Route
-          path="/assistant"
-          element={<Assistant />}
-        />
+          <Route
+            path="/assistant"
+            element={<Assistant />}
+          />
 
-        <Route
-          path="/admin-dashboard"
-          element={<AdminDashboard />}
-        />
+          <Route
+            path="/admin-dashboard"
+            element={<AdminDashboard />}
+          />
+        </Route>
       </Routes>
     </BrowserRouter>
   );

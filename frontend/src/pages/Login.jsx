@@ -30,7 +30,7 @@ function Login() {
 
       const token = response.data.access_token;
 
-      localStorage.setItem("token", token);
+      localStorage.setItem("access_token", token);
 
       const profileResponse = await api.get("/api/profile", {
         headers: {

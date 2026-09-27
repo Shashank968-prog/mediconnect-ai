@@ -7,18 +7,39 @@ function BookAppointment() {
   const location = useLocation();
 
   const params = new URLSearchParams(location.search);
-  const doctorId = params.get("doctor_id");
+  const queryDoctorId = params.get("doctor_id");
 
-  const [appointmentDate, setAppointmentDate] = useState("");
-  const [appointmentTime, setAppointmentTime] = useState("");
+  const selectedDoctor = location.state || {};
+
+  const doctorId =
+    selectedDoctor.doctorUserId ||
+    selectedDoctor.doctorId ||
+    queryDoctorId;
+
+  const doctorName =
+    selectedDoctor.doctorName || "";
+
+  const specialization =
+    selectedDoctor.specialization || "";
+
+  const [appointmentDate, setAppointmentDate] =
+    useState("");
+
+  const [appointmentTime, setAppointmentTime] =
+    useState("");
+
   const [reason, setReason] = useState("");
+
   const [message, setMessage] = useState("");
+
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const token = localStorage.getItem("access_token");
+    const token =
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("token");
 
     if (!token) {
       navigate("/login");
@@ -34,7 +55,8 @@ function BookAppointment() {
       setLoading(true);
       setMessage("");
 
-      const appointmentDateTime = `${appointmentDate}T${appointmentTime}:00`;
+      const appointmentDateTime =
+        `${appointmentDate}T${appointmentTime}:00`;
 
       await api.post(
         "/api/appointments",
@@ -69,9 +91,16 @@ function BookAppointment() {
     <main className="dashboard-page">
       <section className="dashboard-header">
         <div>
-          <p className="dashboard-tag">MEDICONNECT AI</p>
+          <p className="dashboard-tag">
+            MEDICONNECT AI
+          </p>
+
           <h1>Book Appointment</h1>
-          <p>Schedule an appointment with your selected doctor.</p>
+
+          <p>
+            Schedule an appointment with your selected
+            doctor.
+          </p>
         </div>
 
         <button
@@ -86,10 +115,43 @@ function BookAppointment() {
         <h2>Appointment Details</h2>
 
         <form onSubmit={handleSubmit}>
+          {doctorName && (
+            <div className="form-group">
+              <label htmlFor="doctor-name">
+                Doctor
+              </label>
+
+              <input
+                id="doctor-name"
+                type="text"
+                value={doctorName}
+                readOnly
+              />
+            </div>
+          )}
+
+          {specialization && (
+            <div className="form-group">
+              <label htmlFor="doctor-specialization">
+                Specialization
+              </label>
+
+              <input
+                id="doctor-specialization"
+                type="text"
+                value={specialization}
+                readOnly
+              />
+            </div>
+          )}
+
           <div className="form-group">
-            <label>Doctor ID</label>
+            <label htmlFor="doctor-id">
+              Doctor ID
+            </label>
 
             <input
+              id="doctor-id"
               type="text"
               value={doctorId || ""}
               readOnly
@@ -97,9 +159,12 @@ function BookAppointment() {
           </div>
 
           <div className="form-group">
-            <label>Appointment Date</label>
+            <label htmlFor="appointment-date">
+              Appointment Date
+            </label>
 
             <input
+              id="appointment-date"
               type="date"
               value={appointmentDate}
               onChange={(event) =>
@@ -110,9 +175,12 @@ function BookAppointment() {
           </div>
 
           <div className="form-group">
-            <label>Appointment Time</label>
+            <label htmlFor="appointment-time">
+              Appointment Time
+            </label>
 
             <input
+              id="appointment-time"
               type="time"
               value={appointmentTime}
               onChange={(event) =>
@@ -123,19 +191,29 @@ function BookAppointment() {
           </div>
 
           <div className="form-group">
-            <label>Reason for Visit</label>
+            <label htmlFor="appointment-reason">
+              Reason for Visit
+            </label>
 
             <textarea
+              id="appointment-reason"
               value={reason}
-              onChange={(event) => setReason(event.target.value)}
+              onChange={(event) =>
+                setReason(event.target.value)
+              }
               placeholder="Enter the reason for your appointment"
               rows="4"
               required
             />
           </div>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Booking..." : "Book Appointment"}
+          <button
+            type="submit"
+            disabled={loading}
+          >
+            {loading
+              ? "Booking..."
+              : "Book Appointment"}
           </button>
 
           {message && <p>{message}</p>}
