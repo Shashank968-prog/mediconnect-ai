@@ -67,6 +67,49 @@ def search_doctors(specialization: str) -> str:
     finally:
         db.close()
 
+@mcp.tool()
+def search_doctor_by_name(name: str) -> str:
+    db = SessionLocal()
+
+    try:
+        doctors = (
+            db.query(DoctorProfile, User)
+            .join(
+                User,
+                DoctorProfile.user_id == User.id
+            )
+            .filter(
+                User.name.ilike(f"%{name}%"),
+                DoctorProfile.verification_status == "approved",
+                User.role == "doctor",
+                User.is_active == True
+            )
+            .all()
+        )
+
+        if not doctors:
+            return f"No doctor found with name: {name}"
+
+        results = []
+
+        for doctor_profile, user in doctors:
+            results.append(
+                f"Doctor: {user.name}, "
+                f"Specialization: {doctor_profile.specialization}, "
+                f"Qualification: {doctor_profile.qualification}, "
+                f"Experience: {doctor_profile.experience} years, "
+                f"Doctor ID: {user.id}"
+            )
+
+        return "\n".join(results)
+
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        raise
+
+    finally:
+        db.close()
 
 @mcp.tool()
 def get_doctor_details(doctor_id: int) -> str:
@@ -228,7 +271,7 @@ def book_appointment(
                 DoctorProfile.user_id == User.id
             )
             .filter(
-                DoctorProfile.id == doctor_id,
+                User.id == doctor_id,
                 User.role == "doctor",
                 User.is_active == True,
                 DoctorProfile.verification_status == "approved"
@@ -255,8 +298,7 @@ def book_appointment(
             db.query(Appointment)
             .filter(
                 Appointment.doctor_id == doctor.id,
-                Appointment.appointment_date ==
-                appointment_datetime,
+                Appointment.appointment_date == appointment_datetime,
                 Appointment.status != "cancelled"
             )
             .first()
@@ -296,6 +338,7 @@ def book_appointment(
 
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     mcp.run()

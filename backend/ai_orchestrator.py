@@ -1,6 +1,6 @@
 import asyncio
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from backend.mcp_client import call_mcp_tool
 from rag.rag_service import ask_rag
@@ -70,10 +70,11 @@ def extract_specialization(message: str):
     return None
 
 
-def extract_doctor_id(message: str):
+def extract_appointment_id(message: str):
     match = re.search(
-        r"doctor\s*(?:id\s*)?(\d+)",
-        message.lower()
+        r"\bappointment\s*(?:id\s*)?(\d+)\b",
+        message,
+        re.IGNORECASE
     )
 
     if match:
@@ -82,14 +83,63 @@ def extract_doctor_id(message: str):
     return None
 
 
-def extract_appointment_id(message: str):
+def extract_doctor_name(message: str):
     match = re.search(
-        r"appointment\s*(?:id\s*)?(\d+)",
-        message.lower()
+        r"\bdr\.?\s+([a-z]+)",
+        message,
+        re.IGNORECASE
     )
 
     if match:
-        return int(match.group(1))
+        return match.group(1).strip()
+
+    return None
+
+
+def extract_doctor_id_from_conversation(conversation, doctor_name):
+    if not doctor_name:
+        return None
+
+    doctor_name_normalized = re.sub(
+        r"\s+",
+        " ",
+        doctor_name.lower()
+    ).strip()
+
+    doctor_name_normalized = re.sub(
+        r"^dr\.?\s*",
+        "",
+        doctor_name_normalized
+    )
+
+    for chat_message in reversed(conversation.messages):
+        if chat_message.role != "assistant":
+            continue
+
+        message = chat_message.message
+
+        pattern = re.compile(
+            r"Doctor:\s*([^,\n]+).*?Doctor ID:\s*(\d+)",
+            re.IGNORECASE | re.DOTALL
+        )
+
+        matches = pattern.findall(message)
+
+        for name, doctor_id in matches:
+            name_normalized = re.sub(
+                r"\s+",
+                " ",
+                name.lower()
+            ).strip()
+
+            name_normalized = re.sub(
+                r"^dr\.?\s*",
+                "",
+                name_normalized
+            )
+
+            if name_normalized == doctor_name_normalized:
+                return int(doctor_id)
 
     return None
 
@@ -97,9 +147,44 @@ def extract_appointment_id(message: str):
 def extract_booking_datetime(message: str):
     message_lower = message.lower()
 
+    now = datetime.now()
+
+    relative_match = re.search(
+        r"\b(today|tomorrow)\b"
+        r"(?:\s+at)?"
+        r"\s+(\d{1,2})(?::(\d{2}))?"
+        r"\s*(am|pm)?",
+        message_lower
+    )
+
+    if relative_match:
+        relative_day, hour, minute, meridiem = relative_match.groups()
+
+        hour = int(hour)
+        minute = int(minute or 0)
+
+        if meridiem == "pm" and hour != 12:
+            hour += 12
+        elif meridiem == "am" and hour == 12:
+            hour = 0
+
+        booking_date = now.date()
+
+        if relative_day == "tomorrow":
+            booking_date += timedelta(days=1)
+
+        return datetime(
+            booking_date.year,
+            booking_date.month,
+            booking_date.day,
+            hour,
+            minute
+        )
+
     match = re.search(
         r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+"
-        r"(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?",
+        r"(?:at\s+)?(\d{1,2})(?::(\d{2}))?"
+        r"\s*(am|pm)?",
         message_lower
     )
 
@@ -141,7 +226,8 @@ def extract_booking_datetime(message: str):
         r"("
         + "|".join(month_names.keys())
         + r")\s+(\d{1,2}),?\s+(\d{4})\s+"
-        r"(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?",
+        r"(?:at\s+)?(\d{1,2})(?::(\d{2}))?"
+        r"\s*(am|pm)?",
         message_lower
     )
 
@@ -179,10 +265,27 @@ def extract_reason(message: str):
     return ""
 
 
-def process_ai_request(message: str, current_user):
+def process_ai_request(message: str, current_user, conversation, db):
+    print("AI REQUEST RECEIVED:", repr(message))
+
     message_lower = message.lower()
 
-    if "book" in message_lower and "appointment" in message_lower:
+    print(
+        "BOOKING CONDITION:",
+        "book" in message_lower and (
+            "appointment" in message_lower
+            or "doctor" in message_lower
+            or "dr." in message_lower
+            or "dr " in message_lower
+        )
+    )
+
+    if "book" in message_lower and (
+        "appointment" in message_lower
+        or "doctor" in message_lower
+        or "dr." in message_lower
+        or "dr " in message_lower
+    ):
         if current_user.role != "patient":
             return {
                 "answer": "Only patients can book appointments through the AI assistant.",
@@ -192,12 +295,55 @@ def process_ai_request(message: str, current_user):
         doctor_id = extract_doctor_id(message)
 
         if not doctor_id:
-            return {
-                "answer": "Please provide the doctor ID for the appointment.",
-                "sources": []
-            }
+            doctor_name = extract_doctor_name(message)
+
+            print(
+                "DOCTOR NAME EXTRACTED:",
+                repr(doctor_name)
+            )
+
+            if doctor_name:
+                doctor_result = asyncio.run(
+                    call_mcp_tool(
+                        "search_doctor_by_name",
+                        {
+                            "name": doctor_name
+                        }
+                    )
+                )
+
+                doctor_response = doctor_result.content[0].text
+
+                print(
+                    "DOCTOR SEARCH RESPONSE:",
+                    doctor_response
+                )
+
+                match = re.search(
+                    r"Doctor ID:\s*(\d+)",
+                    doctor_response
+                )
+
+                if match:
+                    doctor_id = int(match.group(1))
+
+            if not doctor_id:
+                return {
+                    "answer": "I could not identify the doctor. Please provide the doctor's name.",
+                    "sources": []
+                }
+
+        print(
+            "DOCTOR ID FOUND:",
+            doctor_id
+        )
 
         appointment_datetime = extract_booking_datetime(message)
+
+        print(
+            "APPOINTMENT DATETIME:",
+            appointment_datetime
+        )
 
         if not appointment_datetime:
             return {
@@ -217,6 +363,11 @@ def process_ai_request(message: str, current_user):
                     "reason": reason
                 }
             )
+        )
+
+        print(
+            "BOOKING RESULT:",
+            result.content[0].text
         )
 
         return {
@@ -255,12 +406,12 @@ def process_ai_request(message: str, current_user):
         }
 
     if "appointment" in message_lower and (
-    "my" in message_lower
-    or "show" in message_lower
-    or "view" in message_lower
-    or "what" in message_lower
-    or "have" in message_lower
-):
+        "my" in message_lower
+        or "show" in message_lower
+        or "view" in message_lower
+        or "what" in message_lower
+        or "have" in message_lower
+    ):
         if current_user.role != "patient":
             return {
                 "answer": "Only patients can access their appointments through the AI assistant.",
@@ -329,6 +480,6 @@ def process_ai_request(message: str, current_user):
             }
 
     return ask_rag(
-    message,
-    current_user.id
-)
+        message,
+        current_user.id
+    )

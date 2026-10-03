@@ -968,9 +968,11 @@ def assistant(
     db.commit()
 
     result = process_ai_request(
-        request.message,
-        current_user
-    )
+    request.message,
+    current_user,
+    conversation,
+    db
+)
 
     assistant_message = ChatMessage(
         user_id=current_user.id,
