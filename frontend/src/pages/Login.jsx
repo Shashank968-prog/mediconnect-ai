@@ -22,20 +22,36 @@ function Login() {
       formData.append("username", email);
       formData.append("password", password);
 
-      const response = await api.post("/api/login", formData, {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      });
+      const response = await api.post(
+        "/api/login",
+        formData,
+        {
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded",
+          },
+        }
+      );
 
       const token = response.data.access_token;
 
+      if (!token) {
+        throw new Error(
+          "Login succeeded but no access token was returned."
+        );
+      }
+
       localStorage.setItem("token", token);
-      const profileResponse = await api.get("/api/profile", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+
+      const profileResponse = await api.get(
+        "/api/profile"
+      );
+
+      if (!profileResponse.data) {
+        throw new Error(
+          "Unable to retrieve your profile."
+        );
+      }
 
       const role = profileResponse.data.role;
 
@@ -47,9 +63,21 @@ function Login() {
         navigate("/dashboard");
       }
     } catch (error) {
+      console.error("Login error:", error);
+
+      localStorage.removeItem("token");
+
+      if (error.response?.status === 401) {
+        setMessage(
+          "Invalid email or password. Please try again."
+        );
+        return;
+      }
+
       setMessage(
         error.response?.data?.detail ||
-          "Login failed. Please check your email and password."
+          error.message ||
+          "Login failed. Please try again."
       );
     } finally {
       setLoading(false);
@@ -68,8 +96,11 @@ function Login() {
             <input
               type="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) =>
+                setEmail(event.target.value)
+              }
               placeholder="Enter your email"
+              disabled={loading}
               required
             />
           </div>
@@ -80,14 +111,22 @@ function Login() {
             <input
               type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) =>
+                setPassword(event.target.value)
+              }
               placeholder="Enter your password"
+              disabled={loading}
               required
             />
           </div>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
+          <button
+            type="submit"
+            disabled={loading}
+          >
+            {loading
+              ? "Logging in..."
+              : "Login"}
           </button>
 
           {message && <p>{message}</p>}
@@ -96,7 +135,10 @@ function Login() {
         <p>
           <button
             type="button"
-            onClick={() => navigate("/forgot-password")}
+            onClick={() =>
+              navigate("/forgot-password")
+            }
+            disabled={loading}
           >
             Forgot Password?
           </button>

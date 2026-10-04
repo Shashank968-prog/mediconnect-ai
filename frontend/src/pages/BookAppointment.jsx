@@ -32,6 +32,8 @@ function BookAppointment() {
 
   const [message, setMessage] = useState("");
 
+  const [error, setError] = useState("");
+
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (event) => {
@@ -44,14 +46,26 @@ function BookAppointment() {
       return;
     }
 
+    setMessage("");
+    setError("");
+
     if (!doctorId) {
-      setMessage("Doctor information is missing.");
+      setError("Doctor information is missing.");
+      return;
+    }
+
+    if (!appointmentDate || !appointmentTime) {
+      setError("Please select an appointment date and time.");
+      return;
+    }
+
+    if (!reason.trim()) {
+      setError("Please enter the reason for your visit.");
       return;
     }
 
     try {
       setLoading(true);
-      setMessage("");
 
       const appointmentDateTime =
         `${appointmentDate}T${appointmentTime}:00`;
@@ -61,12 +75,7 @@ function BookAppointment() {
         {
           doctor_id: Number(doctorId),
           appointment_date: appointmentDateTime,
-          reason: reason,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          reason: reason.trim(),
         }
       );
 
@@ -76,9 +85,15 @@ function BookAppointment() {
         navigate("/appointments");
       }, 1000);
     } catch (error) {
-      setMessage(
+      console.error("Appointment booking error:", error);
+
+      if (error.response?.status === 401) {
+        return;
+      }
+
+      setError(
         error.response?.data?.detail ||
-          "Unable to book the appointment."
+          "Unable to book the appointment. Please try again."
       );
     } finally {
       setLoading(false);
@@ -104,6 +119,7 @@ function BookAppointment() {
         <button
           className="logout-button"
           onClick={() => navigate("/doctors")}
+          disabled={loading}
         >
           Back to Doctors
         </button>
@@ -155,6 +171,7 @@ function BookAppointment() {
               onChange={(event) =>
                 setAppointmentDate(event.target.value)
               }
+              disabled={loading}
               required
             />
           </div>
@@ -171,6 +188,7 @@ function BookAppointment() {
               onChange={(event) =>
                 setAppointmentTime(event.target.value)
               }
+              disabled={loading}
               required
             />
           </div>
@@ -188,6 +206,7 @@ function BookAppointment() {
               }
               placeholder="Enter the reason for your appointment"
               rows="4"
+              disabled={loading}
               required
             />
           </div>
@@ -201,7 +220,17 @@ function BookAppointment() {
               : "Book Appointment"}
           </button>
 
-          {message && <p>{message}</p>}
+          {message && (
+            <p className="dashboard-message">
+              {message}
+            </p>
+          )}
+
+          {error && (
+            <p className="dashboard-error">
+              {error}
+            </p>
+          )}
         </form>
       </section>
     </main>

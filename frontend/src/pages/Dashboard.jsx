@@ -45,13 +45,22 @@ function Dashboard() {
 
       setDoctors(doctorResponse.data);
 
-      const appointmentResponse = await api.get("/api/appointments", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const appointmentResponse = await api.get(
+        "/api/appointments",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-      setAppointments(appointmentResponse.data);
+      setAppointments(
+        appointmentResponse.data.filter(
+          (appointment) =>
+            appointment.status !== "cancelled" &&
+            appointment.status !== "completed"
+        )
+      );
     } catch (error) {
       console.error(error);
 
@@ -117,10 +126,11 @@ function Dashboard() {
   return (
     <main className="dashboard-page">
       <div className="dashboard-container">
-
         <section className="dashboard-header">
           <div>
-            <p className="dashboard-tag">MEDICONNECT AI</p>
+            <p className="dashboard-tag">
+              MEDICONNECT AI
+            </p>
 
             <h1>Welcome, {user?.name}</h1>
 
@@ -221,7 +231,9 @@ function Dashboard() {
           <h2>My Appointments</h2>
 
           {appointments.length === 0 ? (
-            <p>You don't have any appointments yet.</p>
+            <p>
+              You don't have any active appointments yet.
+            </p>
           ) : (
             <div className="appointments-list">
               {appointments.map((appointment) => (
@@ -254,7 +266,6 @@ function Dashboard() {
             </div>
           )}
         </section>
-
       </div>
     </main>
   );

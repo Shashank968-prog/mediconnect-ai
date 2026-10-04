@@ -15,25 +15,38 @@ function Register() {
   const [consultationFee, setConsultationFee] = useState("");
 
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
   const handleRegister = async (event) => {
     event.preventDefault();
-    setMessage("");
 
     try {
+      setLoading(true);
+      setMessage("");
+
       await api.post("/api/register", {
         name: fullName,
         email,
         password,
         role,
-        specialization: role === "doctor" ? specialization : null,
-        qualification: role === "doctor" ? qualification : null,
-        experience: role === "doctor" ? Number(experience) : null,
-        license_number: role === "doctor" ? licenseNumber : null,
+        specialization:
+          role === "doctor" ? specialization : null,
+        qualification:
+          role === "doctor" ? qualification : null,
+        experience:
+          role === "doctor"
+            ? Number(experience)
+            : null,
+        license_number:
+          role === "doctor"
+            ? licenseNumber
+            : null,
         consultation_fee:
-          role === "doctor" ? Number(consultationFee) : null,
+          role === "doctor"
+            ? Number(consultationFee)
+            : null,
       });
 
       setMessage(
@@ -44,13 +57,21 @@ function Register() {
         navigate("/login");
       }, 1500);
     } catch (error) {
+      console.error("Registration error:", error);
+
       const detail = error.response?.data?.detail;
 
       setMessage(
         Array.isArray(detail)
-          ? detail.map((item) => item.msg).join(", ")
-          : detail || "Registration failed. Please try again."
+          ? detail
+              .map((item) => item.msg)
+              .join(", ")
+          : detail ||
+              error.message ||
+              "Registration failed. Please try again."
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,7 +79,9 @@ function Register() {
     <main className="auth-page">
       <section className="auth-container">
         <div className="auth-info">
-          <p className="auth-tag">JOIN MEDICONNECT AI</p>
+          <p className="auth-tag">
+            JOIN MEDICONNECT AI
+          </p>
 
           <h1>
             Better healthcare
@@ -66,24 +89,31 @@ function Register() {
           </h1>
 
           <p>
-            Create your account to book appointments, discover doctors,
-            and explore intelligent healthcare assistance.
+            Create your account to book appointments,
+            discover doctors, and explore intelligent
+            healthcare assistance.
           </p>
 
           <div className="auth-benefits">
             <div>
               <span>✓</span>
-              <p>Manage your healthcare appointments</p>
+              <p>
+                Manage your healthcare appointments
+              </p>
             </div>
 
             <div>
               <span>✓</span>
-              <p>Connect with healthcare professionals</p>
+              <p>
+                Connect with healthcare professionals
+              </p>
             </div>
 
             <div>
               <span>✓</span>
-              <p>Access AI-powered healthcare support</p>
+              <p>
+                Access AI-powered healthcare support
+              </p>
             </div>
           </div>
         </div>
@@ -97,9 +127,14 @@ function Register() {
             <p>Join MediConnect AI today.</p>
           </div>
 
-          <form className="auth-form" onSubmit={handleRegister}>
+          <form
+            className="auth-form"
+            onSubmit={handleRegister}
+          >
             <div className="form-group">
-              <label htmlFor="fullName">Full Name</label>
+              <label htmlFor="fullName">
+                Full Name
+              </label>
 
               <input
                 id="fullName"
@@ -109,6 +144,7 @@ function Register() {
                 onChange={(event) =>
                   setFullName(event.target.value)
                 }
+                disabled={loading}
                 required
               />
             </div>
@@ -126,6 +162,7 @@ function Register() {
                 onChange={(event) =>
                   setEmail(event.target.value)
                 }
+                disabled={loading}
                 required
               />
             </div>
@@ -145,6 +182,7 @@ function Register() {
                 }
                 minLength={8}
                 maxLength={128}
+                disabled={loading}
                 required
               />
 
@@ -174,9 +212,15 @@ function Register() {
                 onChange={(event) =>
                   setRole(event.target.value)
                 }
+                disabled={loading}
               >
-                <option value="patient">Patient</option>
-                <option value="doctor">Doctor</option>
+                <option value="patient">
+                  Patient
+                </option>
+
+                <option value="doctor">
+                  Doctor
+                </option>
               </select>
             </div>
 
@@ -193,8 +237,11 @@ function Register() {
                     placeholder="e.g. Cardiology"
                     value={specialization}
                     onChange={(event) =>
-                      setSpecialization(event.target.value)
+                      setSpecialization(
+                        event.target.value
+                      )
                     }
+                    disabled={loading}
                     required
                   />
                 </div>
@@ -210,8 +257,11 @@ function Register() {
                     placeholder="e.g. MBBS, MD"
                     value={qualification}
                     onChange={(event) =>
-                      setQualification(event.target.value)
+                      setQualification(
+                        event.target.value
+                      )
                     }
+                    disabled={loading}
                     required
                   />
                 </div>
@@ -228,8 +278,11 @@ function Register() {
                     placeholder="e.g. 5"
                     value={experience}
                     onChange={(event) =>
-                      setExperience(event.target.value)
+                      setExperience(
+                        event.target.value
+                      )
                     }
+                    disabled={loading}
                     required
                   />
                 </div>
@@ -245,8 +298,11 @@ function Register() {
                     placeholder="Enter license number"
                     value={licenseNumber}
                     onChange={(event) =>
-                      setLicenseNumber(event.target.value)
+                      setLicenseNumber(
+                        event.target.value
+                      )
                     }
+                    disabled={loading}
                     required
                   />
                 </div>
@@ -263,8 +319,11 @@ function Register() {
                     placeholder="e.g. 500"
                     value={consultationFee}
                     onChange={(event) =>
-                      setConsultationFee(event.target.value)
+                      setConsultationFee(
+                        event.target.value
+                      )
                     }
+                    disabled={loading}
                     required
                   />
                 </div>
@@ -274,8 +333,11 @@ function Register() {
             <button
               className="auth-submit"
               type="submit"
+              disabled={loading}
             >
-              Create Account
+              {loading
+                ? "Creating Account..."
+                : "Create Account"}
             </button>
           </form>
 
@@ -293,7 +355,9 @@ function Register() {
 
           <p className="auth-footer">
             Already have an account?{" "}
-            <a href="/login">Login here</a>
+            <a href="/login">
+              Login here
+            </a>
           </p>
         </div>
       </section>

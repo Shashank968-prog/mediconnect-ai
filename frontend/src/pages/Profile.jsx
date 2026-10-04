@@ -4,35 +4,52 @@ import api from "../services/api";
 
 function Profile() {
   const navigate = useNavigate();
+
   const [user, setUser] = useState(null);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      setMessage("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await api.get("/api/profile");
+
+      if (!response.data) {
+        throw new Error("Unable to retrieve profile information.");
+      }
+
+      setUser(response.data);
+    } catch (error) {
+      console.error("Profile loading error:", error);
+
+      if (error.response?.status === 401) {
+        return;
+      }
+
+      setUser(null);
+
+      setMessage(
+        error.response?.data?.detail ||
+          error.message ||
+          "Unable to load profile. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-
-    const fetchProfile = async () => {
-      try {
-        const response = await api.get("/api/profile", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        setUser(response.data);
-      } catch (error) {
-        setMessage(
-          error.response?.data?.detail || "Unable to load profile."
-        );
-      }
-    };
-
     fetchProfile();
-  }, [navigate]);
+  }, []);
 
   return (
     <main className="dashboard-page">
@@ -46,27 +63,58 @@ function Profile() {
         <button
           className="logout-button"
           onClick={() => navigate("/dashboard")}
+          disabled={loading}
         >
           Back to Dashboard
         </button>
       </section>
 
       <section className="dashboard-card">
-        {user ? (
+        {loading && (
+          <div className="appointments-state">
+            <div className="loading-icon">⏳</div>
+
+            <h2>Loading profile...</h2>
+
+            <p>
+              Please wait while we retrieve your profile information.
+            </p>
+          </div>
+        )}
+
+        {!loading && message && (
+          <div className="appointments-state">
+            <div className="empty-icon">⚠️</div>
+
+            <h2>Unable to load profile</h2>
+
+            <p>{message}</p>
+
+            <button
+              className="book-appointment-button"
+              onClick={fetchProfile}
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {!loading && !message && user && (
           <>
             <h2>Personal Information</h2>
+
             <p>
               <strong>Name:</strong> {user.name}
             </p>
+
             <p>
               <strong>Email:</strong> {user.email}
             </p>
+
             <p>
               <strong>Role:</strong> {user.role}
             </p>
           </>
-        ) : (
-          <p>{message || "Loading profile..."}</p>
         )}
       </section>
     </main>

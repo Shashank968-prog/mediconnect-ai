@@ -8,81 +8,113 @@ function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [doctors, setDoctors] = useState([]);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [processingDoctor, setProcessingDoctor] = useState(null);
 
   const loadPendingDoctors = async () => {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-
     try {
+      setError("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
       const response = await api.get(
-        "/api/admin/doctors/pending",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        "/api/admin/doctors/pending"
       );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error(
+          "Unexpected doctor response from server."
+        );
+      }
 
       setDoctors(response.data);
     } catch (error) {
-      setMessage(
+      console.error(
+        "Pending doctors loading error:",
+        error
+      );
+
+      if (error.response?.status === 401) {
+        return;
+      }
+
+      setDoctors([]);
+
+      setError(
         error.response?.data?.detail ||
-          "Unable to load pending doctors."
+          error.message ||
+          "Unable to load pending doctors. Please try again."
       );
     }
   };
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
+  const fetchAdminData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      setMessage("");
 
-    if (!token) {
-      navigate("/login");
-      return;
-    }
+      const token = localStorage.getItem("token");
 
-    const fetchAdminData = async () => {
-      try {
-        const headers = {
-          Authorization: `Bearer ${token}`,
-        };
-
-        const profileResponse = await api.get("/api/profile", {
-          headers,
-        });
-
-        if (profileResponse.data.role !== "admin") {
-          navigate("/dashboard");
-          return;
-        }
-
-        setUser(profileResponse.data);
-
-        const doctorsResponse = await api.get(
-          "/api/admin/doctors/pending",
-          {
-            headers,
-          }
-        );
-
-        setDoctors(doctorsResponse.data);
-      } catch (error) {
-        setMessage(
-          error.response?.data?.detail ||
-            "Unable to load admin dashboard."
-        );
-      } finally {
-        setLoading(false);
+      if (!token) {
+        navigate("/login");
+        return;
       }
-    };
 
+      const profileResponse = await api.get(
+        "/api/profile"
+      );
+
+      if (profileResponse.data.role !== "admin") {
+        navigate("/dashboard");
+        return;
+      }
+
+      setUser(profileResponse.data);
+
+      const doctorsResponse = await api.get(
+        "/api/admin/doctors/pending"
+      );
+
+      if (!Array.isArray(doctorsResponse.data)) {
+        throw new Error(
+          "Unexpected doctor response from server."
+        );
+      }
+
+      setDoctors(doctorsResponse.data);
+    } catch (error) {
+      console.error(
+        "Admin dashboard loading error:",
+        error
+      );
+
+      if (error.response?.status === 401) {
+        return;
+      }
+
+      setUser(null);
+      setDoctors([]);
+
+      setError(
+        error.response?.data?.detail ||
+          error.message ||
+          "Unable to load admin dashboard. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAdminData();
-  }, [navigate]);
+  }, []);
 
   const handleVerification = async (
     doctorProfileId,
@@ -98,16 +130,12 @@ function AdminDashboard() {
     try {
       setProcessingDoctor(doctorProfileId);
       setMessage("");
+      setError("");
 
       await api.patch(
         `/api/admin/doctors/${doctorProfileId}/verify`,
         {
           verification_status: status,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
         }
       );
 
@@ -121,9 +149,18 @@ function AdminDashboard() {
         `Doctor ${status} successfully.`
       );
     } catch (error) {
-      setMessage(
+      console.error(
+        "Doctor verification error:",
+        error
+      );
+
+      if (error.response?.status === 401) {
+        return;
+      }
+
+      setError(
         error.response?.data?.detail ||
-          `Unable to ${status} doctor.`
+          `Unable to ${status} doctor. Please try again.`
       );
     } finally {
       setProcessingDoctor(null);
@@ -139,7 +176,18 @@ function AdminDashboard() {
     return (
       <main className="dashboard-page">
         <div className="dashboard-container">
-          <p>Loading admin dashboard...</p>
+          <section className="dashboard-card">
+            <div className="appointments-state">
+              <div className="loading-icon">⏳</div>
+
+              <h2>Loading admin dashboard...</h2>
+
+              <p>
+                Please wait while we retrieve the
+                pending doctor applications.
+              </p>
+            </div>
+          </section>
         </div>
       </main>
     );
@@ -171,98 +219,121 @@ function AdminDashboard() {
           <button
             className="dashboard-logout"
             onClick={handleLogout}
+            disabled={processingDoctor !== null}
           >
             Logout
           </button>
         </section>
 
-        <section className="dashboard-card">
-          <h2>Pending Doctor Applications</h2>
+        {error && (
+          <section className="dashboard-card">
+            <div className="appointments-state">
+              <div className="empty-icon">⚠️</div>
 
-          {message && (
-            <p className="dashboard-message">
-              {message}
-            </p>
-          )}
+              <h2>Unable to load admin dashboard</h2>
 
-          {doctors.length === 0 ? (
-            <p>
-              There are no pending doctor applications.
-            </p>
-          ) : (
-            <div className="appointments-list">
-              {doctors.map((doctor) => (
-                <div
-                  className="appointment-card"
-                  key={doctor.id}
-                >
-                  <h3>
-                    Dr. {doctor.user?.name}
-                  </h3>
+              <p>{error}</p>
 
-                  <p>
-                    <strong>Email:</strong>{" "}
-                    {doctor.user?.email}
-                  </p>
-
-                  <p>
-                    <strong>Specialization:</strong>{" "}
-                    {doctor.specialization}
-                  </p>
-
-                  <p>
-                    <strong>Qualification:</strong>{" "}
-                    {doctor.qualification}
-                  </p>
-
-                  <p>
-                    <strong>Experience:</strong>{" "}
-                    {doctor.experience} years
-                  </p>
-
-                  <p>
-                    <strong>Status:</strong>{" "}
-                    Pending
-                  </p>
-
-                  <div>
-                    <button
-                      onClick={() =>
-                        handleVerification(
-                          doctor.id,
-                          "approved"
-                        )
-                      }
-                      disabled={
-                        processingDoctor === doctor.id
-                      }
-                    >
-                      {processingDoctor === doctor.id
-                        ? "Processing..."
-                        : "Approve"}
-                    </button>
-
-                    <button
-                      onClick={() =>
-                        handleVerification(
-                          doctor.id,
-                          "rejected"
-                        )
-                      }
-                      disabled={
-                        processingDoctor === doctor.id
-                      }
-                    >
-                      {processingDoctor === doctor.id
-                        ? "Processing..."
-                        : "Reject"}
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <button
+                className="book-appointment-button"
+                onClick={fetchAdminData}
+                disabled={processingDoctor !== null}
+              >
+                Try Again
+              </button>
             </div>
-          )}
-        </section>
+          </section>
+        )}
+
+        {!error && (
+          <section className="dashboard-card">
+            <h2>Pending Doctor Applications</h2>
+
+            {message && (
+              <p className="dashboard-message">
+                {message}
+              </p>
+            )}
+
+            {doctors.length === 0 ? (
+              <p>
+                There are no pending doctor applications.
+              </p>
+            ) : (
+              <div className="appointments-list">
+                {doctors.map((doctor) => (
+                  <div
+                    className="appointment-card"
+                    key={doctor.id}
+                  >
+                    <h3>
+                      Dr. {doctor.user?.name}
+                    </h3>
+
+                    <p>
+                      <strong>Email:</strong>{" "}
+                      {doctor.user?.email}
+                    </p>
+
+                    <p>
+                      <strong>Specialization:</strong>{" "}
+                      {doctor.specialization}
+                    </p>
+
+                    <p>
+                      <strong>Qualification:</strong>{" "}
+                      {doctor.qualification}
+                    </p>
+
+                    <p>
+                      <strong>Experience:</strong>{" "}
+                      {doctor.experience} years
+                    </p>
+
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      Pending
+                    </p>
+
+                    <div>
+                      <button
+                        onClick={() =>
+                          handleVerification(
+                            doctor.id,
+                            "approved"
+                          )
+                        }
+                        disabled={
+                          processingDoctor === doctor.id
+                        }
+                      >
+                        {processingDoctor === doctor.id
+                          ? "Processing..."
+                          : "Approve"}
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          handleVerification(
+                            doctor.id,
+                            "rejected"
+                          )
+                        }
+                        disabled={
+                          processingDoctor === doctor.id
+                        }
+                      >
+                        {processingDoctor === doctor.id
+                          ? "Processing..."
+                          : "Reject"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </main>
   );

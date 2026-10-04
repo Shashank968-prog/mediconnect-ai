@@ -21,15 +21,21 @@ function ForgotPassword() {
       setLoading(true);
       setMessage("");
 
-      const response = await api.post("/api/forgot-password", {
-        email: email,
-      });
+      const response = await api.post(
+        "/api/forgot-password",
+        {
+          email: email.trim(),
+        }
+      );
 
       setMessage(response.data.message);
       setOtpSent(true);
     } catch (error) {
+      console.error("Send OTP error:", error);
+
       setMessage(
         error.response?.data?.detail ||
+          error.message ||
           "Unable to send OTP. Please try again."
       );
     } finally {
@@ -59,11 +65,14 @@ function ForgotPassword() {
       setLoading(true);
       setMessage("");
 
-      const response = await api.post("/api/reset-password", {
-        email: email,
-        otp: otp,
-        new_password: newPassword,
-      });
+      const response = await api.post(
+        "/api/reset-password",
+        {
+          email: email.trim(),
+          otp: otp.trim(),
+          new_password: newPassword,
+        }
+      );
 
       setMessage(response.data.message);
 
@@ -71,8 +80,11 @@ function ForgotPassword() {
         navigate("/login");
       }, 1500);
     } catch (error) {
+      console.error("Password reset error:", error);
+
       setMessage(
         error.response?.data?.detail ||
+          error.message ||
           "Unable to reset password. Please try again."
       );
     } finally {
@@ -99,21 +111,30 @@ function ForgotPassword() {
                 <input
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
                   placeholder="Enter your email"
+                  disabled={loading}
                   required
                 />
               </div>
 
-              <button type="submit" disabled={loading}>
-                {loading ? "Sending OTP..." : "Send OTP"}
+              <button
+                type="submit"
+                disabled={loading}
+              >
+                {loading
+                  ? "Sending OTP..."
+                  : "Send OTP"}
               </button>
             </form>
           </>
         ) : (
           <>
             <p>
-              OTP has been sent to <strong>{email}</strong>.
+              OTP has been sent to{" "}
+              <strong>{email}</strong>.
             </p>
 
             <form onSubmit={handleResetPassword}>
@@ -123,10 +144,13 @@ function ForgotPassword() {
                 <input
                   type="text"
                   value={otp}
-                  onChange={(event) => setOtp(event.target.value)}
+                  onChange={(event) =>
+                    setOtp(event.target.value)
+                  }
                   placeholder="Enter 6-digit OTP"
                   maxLength="6"
                   pattern="[0-9]{6}"
+                  disabled={loading}
                   required
                 />
               </div>
@@ -143,6 +167,7 @@ function ForgotPassword() {
                   placeholder="Enter new password"
                   minLength={8}
                   maxLength={128}
+                  disabled={loading}
                   required
                 />
 
@@ -162,23 +187,33 @@ function ForgotPassword() {
               </div>
 
               <div className="form-group">
-                <label>Confirm New Password</label>
+                <label>
+                  Confirm New Password
+                </label>
 
                 <input
                   type="password"
                   value={confirmPassword}
                   onChange={(event) =>
-                    setConfirmPassword(event.target.value)
+                    setConfirmPassword(
+                      event.target.value
+                    )
                   }
                   placeholder="Confirm new password"
                   minLength={8}
                   maxLength={128}
+                  disabled={loading}
                   required
                 />
               </div>
 
-              <button type="submit" disabled={loading}>
-                {loading ? "Resetting Password..." : "Reset Password"}
+              <button
+                type="submit"
+                disabled={loading}
+              >
+                {loading
+                  ? "Resetting Password..."
+                  : "Reset Password"}
               </button>
             </form>
           </>
@@ -190,6 +225,7 @@ function ForgotPassword() {
           <button
             type="button"
             onClick={() => navigate("/login")}
+            disabled={loading}
           >
             Back to Login
           </button>

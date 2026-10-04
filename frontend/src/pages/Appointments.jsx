@@ -4,43 +4,63 @@ import api from "../services/api";
 
 function Appointments() {
   const navigate = useNavigate();
+
   const [appointments, setAppointments] = useState([]);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState(null);
+
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true);
+      setMessage("");
+      setError("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await api.get("/api/appointments");
+
+      if (!Array.isArray(response.data)) {
+        throw new Error(
+          "Unexpected appointments response from server."
+        );
+      }
+
+      setAppointments(
+        response.data.filter(
+          (appointment) =>
+            appointment.status !== "cancelled" &&
+            appointment.status !== "completed"
+        )
+      );
+    } catch (error) {
+      console.error("Appointments loading error:", error);
+
+      if (error.response?.status === 401) {
+        return;
+      }
+
+      setAppointments([]);
+
+      setError(
+        error.response?.data?.detail ||
+          error.message ||
+          "Unable to load your appointments. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-
-    const fetchAppointments = async () => {
-      try {
-        const response = await api.get("/api/appointments", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        setAppointments(
-          response.data.filter(
-            (appointment) => appointment.status !== "cancelled"
-          )
-        );
-      } catch (error) {
-        setMessage(
-          error.response?.data?.detail ||
-            "Unable to load your appointments."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchAppointments();
-  }, [navigate]);
+  }, []);
 
   const handleCancel = async (appointmentId) => {
     const token = localStorage.getItem("token");
@@ -51,14 +71,12 @@ function Appointments() {
     }
 
     try {
+      setCancellingId(appointmentId);
+      setMessage("");
+      setError("");
+
       await api.patch(
-        `/api/appointments/${appointmentId}/cancel`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        `/api/appointments/${appointmentId}/cancel`
       );
 
       setAppointments((currentAppointments) =>
@@ -69,24 +87,24 @@ function Appointments() {
 
       setMessage("Appointment cancelled successfully.");
     } catch (error) {
-      setMessage(
+      console.error("Appointment cancellation error:", error);
+
+      if (error.response?.status === 401) {
+        return;
+      }
+
+      setError(
         error.response?.data?.detail ||
-          "Unable to cancel the appointment."
+          "Unable to cancel the appointment. Please try again."
       );
+    } finally {
+      setCancellingId(null);
     }
   };
 
   const getStatusClass = (status) => {
     if (status === "confirmed") {
       return "status-confirmed";
-    }
-
-    if (status === "completed") {
-      return "status-completed";
-    }
-
-    if (status === "cancelled") {
-      return "status-cancelled";
     }
 
     return "status-pending";
@@ -150,123 +168,160 @@ function Appointments() {
         </section>
       )}
 
-      {!loading && appointments.length === 0 && (
+      {!loading && error && (
         <section className="appointments-state">
-          <div className="empty-icon">📅</div>
+          <div className="empty-icon">⚠️</div>
 
-          <h2>No appointments yet</h2>
+          <h2>Unable to load appointments</h2>
 
-          <p>
-            You haven't booked any appointments. Find a doctor and
-            schedule your first appointment.
-          </p>
+          <p>{error}</p>
 
           <button
             className="book-appointment-button"
-            onClick={() => navigate("/book-appointment")}
+            onClick={fetchAppointments}
           >
-            Book Your First Appointment
+            Try Again
           </button>
         </section>
       )}
 
-      {!loading && appointments.length > 0 && (
-        <section className="appointments-section">
-          <div className="appointments-section-title">
-            <div>
-              <h2>Appointment History</h2>
+      {!loading &&
+        !error &&
+        appointments.length === 0 && (
+          <section className="appointments-state">
+            <div className="empty-icon">📅</div>
 
-              <p>{appointments.length} appointment(s)</p>
+            <h2>No active appointments</h2>
+
+            <p>
+              You currently don't have any active appointments.
+              Find a doctor and schedule an appointment.
+            </p>
+
+            <button
+              className="book-appointment-button"
+              onClick={() => navigate("/book-appointment")}
+            >
+              Book an Appointment
+            </button>
+          </section>
+        )}
+
+      {!loading &&
+        !error &&
+        appointments.length > 0 && (
+          <section className="appointments-section">
+            <div className="appointments-section-title">
+              <div>
+                <h2>My Active Appointments</h2>
+
+                <p>
+                  {appointments.length} active appointment
+                  {appointments.length !== 1 ? "s" : ""}
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="appointments-grid">
-            {appointments.map((appointment) => (
-              <article
-                className="appointment-card"
-                key={appointment.id}
-              >
-                <div className="appointment-card-top">
-                  <div className="doctor-avatar">
-                    👨‍⚕️
+            <div className="appointments-grid">
+              {appointments.map((appointment) => (
+                <article
+                  className="appointment-card"
+                  key={appointment.id}
+                >
+                  <div className="appointment-card-top">
+                    <div className="doctor-avatar">
+                      👨‍⚕️
+                    </div>
+
+                    <span
+                      className={`appointment-status ${getStatusClass(
+                        appointment.status
+                      )}`}
+                    >
+                      {formatStatus(appointment.status)}
+                    </span>
                   </div>
 
-                  <span
-                    className={`appointment-status ${getStatusClass(
-                      appointment.status
-                    )}`}
-                  >
-                    {formatStatus(appointment.status)}
-                  </span>
-                </div>
+                  <div className="doctor-info">
+                    <h3>{appointment.doctor_name}</h3>
 
-                <div className="doctor-info">
-                  <h3>{appointment.doctor_name}</h3>
-
-                  <p className="specialization">
-                    {appointment.specialization}
-                  </p>
-                </div>
-
-                <div className="appointment-date-box">
-                  <div>
-                    <span className="detail-label">DATE</span>
-
-                    <strong>
-                      📅 {formatDate(appointment.appointment_date)}
-                    </strong>
+                    <p className="specialization">
+                      {appointment.specialization}
+                    </p>
                   </div>
 
-                  <div>
-                    <span className="detail-label">TIME</span>
+                  <div className="appointment-date-box">
+                    <div>
+                      <span className="detail-label">
+                        DATE
+                      </span>
 
-                    <strong>
-                      🕐 {formatTime(appointment.appointment_date)}
-                    </strong>
+                      <strong>
+                        📅{" "}
+                        {formatDate(
+                          appointment.appointment_date
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span className="detail-label">
+                        TIME
+                      </span>
+
+                      <strong>
+                        🕐{" "}
+                        {formatTime(
+                          appointment.appointment_date
+                        )}
+                      </strong>
+                    </div>
                   </div>
-                </div>
 
-                <div className="appointment-details">
-                  <div className="detail-row">
-                    <span>Qualification</span>
+                  <div className="appointment-details">
+                    <div className="detail-row">
+                      <span>Qualification</span>
 
-                    <strong>
-                      {appointment.qualification}
-                    </strong>
+                      <strong>
+                        {appointment.qualification}
+                      </strong>
+                    </div>
+
+                    <div className="detail-row">
+                      <span>Experience</span>
+
+                      <strong>
+                        {appointment.experience_years} years
+                      </strong>
+                    </div>
+
+                    <div className="detail-row">
+                      <span>Reason</span>
+
+                      <strong>
+                        {appointment.reason}
+                      </strong>
+                    </div>
                   </div>
 
-                  <div className="detail-row">
-                    <span>Experience</span>
-
-                    <strong>
-                      {appointment.experience_years} years
-                    </strong>
-                  </div>
-
-                  <div className="detail-row">
-                    <span>Reason</span>
-
-                    <strong>
-                      {appointment.reason}
-                    </strong>
-                  </div>
-                </div>
-
-                {appointment.status !== "completed" && (
                   <button
                     className="cancel-appointment-button"
                     onClick={() =>
                       handleCancel(appointment.id)
                     }
+                    disabled={
+                      cancellingId === appointment.id
+                    }
                   >
-                    Cancel Appointment
+                    {cancellingId === appointment.id
+                      ? "Cancelling..."
+                      : "Cancel Appointment"}
                   </button>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
     </main>
   );
 }

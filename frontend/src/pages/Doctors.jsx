@@ -17,28 +17,30 @@ function Doctors() {
       const token = localStorage.getItem("token");
 
       if (!token) {
-        setError("Please login to view doctors.");
+        navigate("/login");
         return;
       }
 
-      const response = await api.get("/api/doctors", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await api.get("/api/doctors");
 
-      if (Array.isArray(response.data)) {
-        setDoctors(response.data);
-      } else {
-        setDoctors([]);
-        setError("Unexpected doctors response from server.");
+      if (!Array.isArray(response.data)) {
+        throw new Error("Unexpected doctors response from server.");
       }
+
+      setDoctors(response.data);
     } catch (error) {
       console.error("Doctors loading error:", error);
 
+      if (error.response?.status === 401) {
+        return;
+      }
+
+      setDoctors([]);
+
       setError(
         error.response?.data?.detail ||
-          "Unable to load doctors."
+          error.message ||
+          "Unable to load doctors. Please try again."
       );
     } finally {
       setLoading(false);
@@ -89,10 +91,12 @@ function Doctors() {
             <div>
               <h2>Available Doctors</h2>
 
-              <p>
-                {doctors.length} doctor
-                {doctors.length !== 1 ? "s" : ""} available
-              </p>
+              {!loading && !error && (
+                <p>
+                  {doctors.length} doctor
+                  {doctors.length !== 1 ? "s" : ""} available
+                </p>
+              )}
             </div>
           </div>
 
