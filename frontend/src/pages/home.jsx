@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 function Home() {
   return (
     <main className="home-page">
@@ -16,13 +18,13 @@ function Home() {
           </p>
 
           <div className="hero-buttons">
-            <a href="/register" className="primary-button">
+            <Link to="/register" className="primary-button">
               Get Started
-            </a>
+            </Link>
 
-            <a href="/login" className="secondary-button">
+            <Link to="/login" className="secondary-button">
               Login
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -43,23 +45,29 @@ function Home() {
         <h2>Everything You Need for Better Healthcare</h2>
 
         <div className="feature-grid">
-          <div className="feature-card">
+          <Link to="/doctors" className="feature-card">
             <div className="feature-icon">👨‍⚕️</div>
             <h3>Find Doctors</h3>
-            <p>Discover healthcare professionals and explore their profiles.</p>
-          </div>
+            <p>
+              Discover healthcare professionals and explore their profiles.
+            </p>
+          </Link>
 
-          <div className="feature-card">
+          <Link to="/book-appointment" className="feature-card">
             <div className="feature-icon">📅</div>
             <h3>Book Appointments</h3>
-            <p>Schedule and manage your healthcare appointments easily.</p>
-          </div>
+            <p>
+              Schedule and manage your healthcare appointments easily.
+            </p>
+          </Link>
 
-          <div className="feature-card">
+          <Link to="/assistant" className="feature-card">
             <div className="feature-icon">🤖</div>
             <h3>AI Health Assistant</h3>
-            <p>Ask questions and explore healthcare information using AI.</p>
-          </div>
+            <p>
+              Ask questions and explore healthcare information using AI.
+            </p>
+          </Link>
         </div>
       </section>
     </main>

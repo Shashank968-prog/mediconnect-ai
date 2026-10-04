@@ -2198,3 +2198,24 @@
     padding: 20px;
   }
 }
+
+.nav-links .nav-register:hover {
+  color: #ffffff;
+  background: #066b76;
+}
+
+.nav-links .nav-logout {
+  padding: 12px 22px;
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  background: #087f8c;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.nav-links .nav-logout:hover {
+  background: #066b76;
+}
