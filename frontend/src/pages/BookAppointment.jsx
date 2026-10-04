@@ -37,9 +37,7 @@ function BookAppointment() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const token =
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("token");
+    const token = localStorage.getItem("token");
 
     if (!token) {
       navigate("/login");
@@ -144,19 +142,6 @@ function BookAppointment() {
               />
             </div>
           )}
-
-          <div className="form-group">
-            <label htmlFor="doctor-id">
-              Doctor ID
-            </label>
-
-            <input
-              id="doctor-id"
-              type="text"
-              value={doctorId || ""}
-              readOnly
-            />
-          </div>
 
           <div className="form-group">
             <label htmlFor="appointment-date">

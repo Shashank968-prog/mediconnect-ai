@@ -9,7 +9,7 @@ function Appointments() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("token");
 
     if (!token) {
       navigate("/login");
@@ -24,7 +24,11 @@ function Appointments() {
           },
         });
 
-        setAppointments(response.data);
+        setAppointments(
+          response.data.filter(
+            (appointment) => appointment.status !== "cancelled"
+          )
+        );
       } catch (error) {
         setMessage(
           error.response?.data?.detail ||
@@ -39,7 +43,7 @@ function Appointments() {
   }, [navigate]);
 
   const handleCancel = async (appointmentId) => {
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("token");
 
     if (!token) {
       navigate("/login");
@@ -58,10 +62,8 @@ function Appointments() {
       );
 
       setAppointments((currentAppointments) =>
-        currentAppointments.map((appointment) =>
-          appointment.id === appointmentId
-            ? { ...appointment, status: "cancelled" }
-            : appointment
+        currentAppointments.filter(
+          (appointment) => appointment.id !== appointmentId
         )
       );
 
@@ -139,8 +141,12 @@ function Appointments() {
       {loading && (
         <section className="appointments-state">
           <div className="loading-icon">⏳</div>
+
           <h2>Loading your appointments...</h2>
-          <p>Please wait while we retrieve your appointment history.</p>
+
+          <p>
+            Please wait while we retrieve your appointment history.
+          </p>
         </section>
       )}
 
@@ -169,6 +175,7 @@ function Appointments() {
           <div className="appointments-section-title">
             <div>
               <h2>Appointment History</h2>
+
               <p>{appointments.length} appointment(s)</p>
             </div>
           </div>
@@ -204,6 +211,7 @@ function Appointments() {
                 <div className="appointment-date-box">
                   <div>
                     <span className="detail-label">DATE</span>
+
                     <strong>
                       📅 {formatDate(appointment.appointment_date)}
                     </strong>
@@ -211,6 +219,7 @@ function Appointments() {
 
                   <div>
                     <span className="detail-label">TIME</span>
+
                     <strong>
                       🕐 {formatTime(appointment.appointment_date)}
                     </strong>
@@ -220,6 +229,7 @@ function Appointments() {
                 <div className="appointment-details">
                   <div className="detail-row">
                     <span>Qualification</span>
+
                     <strong>
                       {appointment.qualification}
                     </strong>
@@ -227,6 +237,7 @@ function Appointments() {
 
                   <div className="detail-row">
                     <span>Experience</span>
+
                     <strong>
                       {appointment.experience_years} years
                     </strong>
@@ -234,23 +245,23 @@ function Appointments() {
 
                   <div className="detail-row">
                     <span>Reason</span>
+
                     <strong>
                       {appointment.reason}
                     </strong>
                   </div>
                 </div>
 
-                {appointment.status !== "cancelled" &&
-                  appointment.status !== "completed" && (
-                    <button
-                      className="cancel-appointment-button"
-                      onClick={() =>
-                        handleCancel(appointment.id)
-                      }
-                    >
-                      Cancel Appointment
-                    </button>
-                  )}
+                {appointment.status !== "completed" && (
+                  <button
+                    className="cancel-appointment-button"
+                    onClick={() =>
+                      handleCancel(appointment.id)
+                    }
+                  >
+                    Cancel Appointment
+                  </button>
+                )}
               </article>
             ))}
           </div>
