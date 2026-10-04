@@ -65,6 +65,10 @@ from rag.rag_service import (
 )
 
 import re
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+MAX_PDF_SIZE = 10 * 1024 * 1024
 
 from fastapi import (
     FastAPI,
@@ -73,6 +77,7 @@ from fastapi import (
     UploadFile,
     File
 )
+from fastapi import FastAPI, Request
 from fastapi import (
     FastAPI,
     Depends,
@@ -83,6 +88,8 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from pathlib import Path
 from datetime import datetime
+from fastapi.responses import Response
+limiter = Limiter(key_func=get_remote_address)
 
 load_dotenv()
 
@@ -108,6 +115,7 @@ app = FastAPI(
     description="Healthcare management and AI platform",
     version="0.1.0"
 )
+app.state.limiter = limiter
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -118,7 +126,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
 
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    return response
 
 @app.get("/")
 def home():
@@ -222,7 +238,9 @@ def register_user(
 
 
 @app.post("/api/login")
+@limiter.limit("5/minute")
 def login_user(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
@@ -707,12 +725,14 @@ def deactivate_account(
 
 
 @app.post("/api/forgot-password")
+@limiter.limit("3/minute")
 async def forgot_password(
-    request: ForgotPasswordRequest,
+    request: Request,
+    reset_request: ForgotPasswordRequest,
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(
-        User.email == request.email
+        User.email == reset_request.email
     ).first()
 
     if not user:
@@ -740,7 +760,7 @@ async def forgot_password(
 
     message = MessageSchema(
         subject="MediConnect AI - Password Reset OTP",
-        recipients=[request.email],
+        recipients=[reset_request.email],
         body=f"""
 Hello,
 
@@ -768,12 +788,14 @@ MediConnect AI
 
 
 @app.post("/api/reset-password")
+@limiter.limit("5/minute")
 def reset_password(
-    request: ResetPasswordRequest,
+    request: Request,
+    reset_request: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(
-        User.email == request.email
+        User.email == reset_request.email
     ).first()
 
     if not user:
@@ -790,7 +812,7 @@ def reset_password(
         r".{8,128}$"
     )
 
-    if not re.match(password_pattern, request.new_password):
+    if not re.match(password_pattern, reset_request.new_password):
         raise HTTPException(
             status_code=400,
             detail=(
@@ -829,7 +851,7 @@ def reset_password(
         )
 
     if not verify_password(
-        request.otp,
+        reset_request.otp,
         reset_otp.otp_hash
     ):
         reset_otp.attempts += 1
@@ -841,7 +863,7 @@ def reset_password(
         )
 
     user.password = hash_password(
-        request.new_password
+        reset_request.new_password
     )
 
     reset_otp.used = True
@@ -852,14 +874,15 @@ def reset_password(
         "message": "Password reset successfully."
     }
 
-
 @app.post("/api/verify-otp")
+@limiter.limit("5/minute")
 def verify_otp(
-    request: VerifyOTPRequest,
+    request: Request,
+    verify_request: VerifyOTPRequest,
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(
-        User.email == request.email
+        User.email == verify_request.email
     ).first()
 
     if not user:
@@ -896,7 +919,10 @@ def verify_otp(
             detail="Too many incorrect OTP attempts."
         )
 
-    if not verify_password(request.otp, reset_otp.otp_hash):
+    if not verify_password(
+        verify_request.otp,
+        reset_otp.otp_hash
+    ):
         reset_otp.attempts += 1
         db.commit()
 
@@ -908,8 +934,6 @@ def verify_otp(
     return {
         "message": "OTP verified successfully."
     }
-
-
 
 @app.post("/api/assistant")
 def assistant(
@@ -1044,6 +1068,8 @@ async def upload_pdf(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    MAX_PDF_SIZE = 10 * 1024 * 1024
+
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=400,
@@ -1065,9 +1091,31 @@ async def upload_pdf(
         exist_ok=True
     )
 
-    file_path = upload_directory / file.filename
+    safe_filename = Path(
+        file.filename.replace("\\", "/")
+    ).name
+
+    if not safe_filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file name."
+        )
+
+    file_path = upload_directory / safe_filename
 
     file_content = await file.read()
+
+    if len(file_content) > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail="PDF file is too large. Maximum allowed size is 10 MB."
+        )
+
+    if not file_content.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid PDF file."
+        )
 
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
@@ -1080,7 +1128,7 @@ async def upload_pdf(
 
         document = UserDocument(
             user_id=current_user.id,
-            filename=file.filename,
+            filename=safe_filename,
             file_path=str(file_path),
             chunk_count=chunk_count
         )
@@ -1097,12 +1145,14 @@ async def upload_pdf(
         }
 
     except Exception as error:
+        print("PDF processing error:", error)
+
         if file_path.exists():
             file_path.unlink()
 
         raise HTTPException(
             status_code=500,
-            detail=f"Unable to process PDF: {str(error)}"
+            detail="Unable to process the PDF. Please try again."
         )
 
 
@@ -1351,3 +1401,4 @@ def delete_conversation(
     return {
         "message": "Conversation deleted successfully."
     }
+

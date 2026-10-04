@@ -14,6 +14,10 @@ from backend.models import User
 load_dotenv()
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+
+if not JWT_SECRET_KEY:
+    raise RuntimeError("JWT_SECRET_KEY is not configured.")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -79,7 +83,11 @@ def get_current_user(
     if current_user is None:
         raise credentials_exception
 
+    if not current_user.is_active:
+        raise credentials_exception
+
     return current_user
+
 
 def require_admin(
     current_user: User = Depends(get_current_user)
