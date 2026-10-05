@@ -123,7 +123,7 @@ def get_doctor_details(doctor_id: int) -> str:
                 DoctorProfile.user_id == User.id
             )
             .filter(
-                DoctorProfile.id == doctor_id,
+                User.id == doctor_id,
                 User.role == "doctor",
                 User.is_active == True,
                 DoctorProfile.verification_status == "approved"
@@ -140,7 +140,7 @@ def get_doctor_details(doctor_id: int) -> str:
         doctor_profile, user = result
 
         return (
-            f"Doctor ID: {doctor_profile.id}\n"
+            f"Doctor ID: {user.id}\n"
             f"Name: {user.name}\n"
             f"Specialization: "
             f"{doctor_profile.specialization}\n"
@@ -152,6 +152,7 @@ def get_doctor_details(doctor_id: int) -> str:
 
     finally:
         db.close()
+
 
 @mcp.tool()
 def get_patient_appointments(patient_id: int) -> str:
