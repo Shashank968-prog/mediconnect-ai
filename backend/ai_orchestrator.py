@@ -70,9 +70,9 @@ def extract_specialization(message: str):
     return None
 
 
-def extract_appointment_id(message: str):
+def extract_doctor_id(message: str):
     match = re.search(
-        r"\bappointment\s*(?:id\s*)?(\d+)\b",
+        r"\bdoctor\s*(?:id\s*)?(\d+)\b",
         message,
         re.IGNORECASE
     )
